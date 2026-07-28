@@ -33,6 +33,10 @@ services:
         sync: false
       - key: SMTP_PASSWORD
         sync: false
+      - key: THEMUSE_API_KEY
+        sync: false # optional
+      - key: FINDWORK_API_KEY
+        sync: false # optional
 
   - type: cron
     name: job-radar-daily
@@ -59,3 +63,7 @@ services:
         sync: false
       - key: SMTP_PASSWORD
         sync: false
+      - key: THEMUSE_API_KEY
+        sync: false # optional
+      - key: FINDWORK_API_KEY
+        sync: false # optional
