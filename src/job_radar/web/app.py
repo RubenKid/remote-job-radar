@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hmac
+import json
 import threading
 from pathlib import Path
 
@@ -20,8 +21,8 @@ from ..profile_engine.models import CandidateProfile
 from ..providers import get_provider
 from ..search_engine.pipeline import SearchPipeline
 from . import auth as authmod
-from .db import Settings, User, get_sessionmaker, init_engine, session_scope
-from .engine_glue import DbHistory, build_user_config
+from .db import MatchedJob, Settings, User, get_sessionmaker, init_engine, session_scope
+from .engine_glue import DbHistory, build_user_config, save_matches
 from .security import encrypt_secret
 from .settings import WebSettings
 
@@ -69,6 +70,36 @@ def create_app() -> FastAPI:
                 session.commit()
             session.expunge(s)
             return s
+
+    def _matches_for(user_id: int, limit: int = 100) -> list[dict]:
+        Session = get_sessionmaker()
+        with Session() as session:
+            rows = session.scalars(
+                select(MatchedJob)
+                .where(MatchedJob.user_id == user_id)
+                .order_by(
+                    MatchedJob.applied.asc(),
+                    MatchedJob.created_at.desc(),
+                    MatchedJob.score.desc(),
+                )
+                .limit(limit)
+            ).all()
+            return [
+                {
+                    "id": m.id,
+                    "title": m.title,
+                    "company": m.company,
+                    "url": m.url,
+                    "source": m.source,
+                    "region": m.remote_region,
+                    "score": m.score,
+                    "recommendation": m.recommendation,
+                    "applied": m.applied,
+                    "reasons": json.loads(m.reasons or "[]"),
+                    "missing_skills": json.loads(m.missing_skills or "[]"),
+                }
+                for m in rows
+            ]
 
     # ----- Landing -----
     @app.get("/", response_class=HTMLResponse)
@@ -142,10 +173,22 @@ def create_app() -> FastAPI:
                 "user": user,
                 "settings": settings,
                 "profile": profile,
+                "matches": _matches_for(user.id),
                 "msg": msg,
                 "error": error,
             },
         )
+
+    @app.post("/jobs/{match_id}/applied")
+    def toggle_applied(request: Request, match_id: int):
+        uid = authmod.current_user_id(request)
+        if uid is None:
+            return RedirectResponse("/", status_code=303)
+        with session_scope() as session:
+            match = session.get(MatchedJob, match_id)
+            if match is not None and match.user_id == uid:
+                match.applied = not match.applied
+        return RedirectResponse("/dashboard#matches", status_code=303)
 
     # ----- Settings -----
     @app.post("/settings")
@@ -227,6 +270,7 @@ def create_app() -> FastAPI:
                     namespace=str(uid),
                     history=DbHistory(session, uid),
                 )
+                save_matches(session, uid, result.jobs)
             return RedirectResponse(
                 f"/dashboard?msg=Sent+{result.emailed}+jobs+"
                 f"({result.collected}+collected)",

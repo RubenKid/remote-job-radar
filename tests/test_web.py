@@ -86,6 +86,46 @@ def test_local_multi_user(client):
     assert count == 2
 
 
+def test_matched_jobs_shown_on_dashboard_and_toggle(client):
+    import json as _json
+
+    from sqlalchemy import select
+
+    from job_radar.web.db import MatchedJob, User, get_sessionmaker
+
+    client.post("/login", data={"email": "m@example.com", "name": "M"}, follow_redirects=True)
+
+    with get_sessionmaker()() as s:
+        uid = s.scalar(select(User.id))
+        s.add(
+            MatchedJob(
+                user_id=uid,
+                job_uid="test:1",
+                title="Senior iOS Engineer",
+                company="Acme",
+                url="https://example.com/1",
+                source="remotive",
+                remote_region="Worldwide",
+                score=91,
+                recommendation=True,
+                reasons=_json.dumps(["Strong Swift match"]),
+                missing_skills=_json.dumps(["Swift Concurrency"]),
+            )
+        )
+        s.commit()
+        mid = s.scalar(select(MatchedJob.id))
+
+    page = client.get("/dashboard").text
+    assert "Senior iOS Engineer" in page
+    assert "Acme" in page
+    assert "Strong Swift match" in page
+    assert "https://example.com/1" in page
+
+    client.post(f"/jobs/{mid}/applied", follow_redirects=True)
+    with get_sessionmaker()() as s:
+        assert s.get(MatchedJob, mid).applied is True
+
+
 def test_healthz(client):
     assert client.get("/healthz").json() == {"status": "ok"}
 

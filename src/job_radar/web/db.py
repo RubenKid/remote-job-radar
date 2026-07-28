@@ -99,6 +99,29 @@ class SentJob(Base):
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class MatchedJob(Base):
+    """A job the AI selected for a user — shown on their dashboard."""
+
+    __tablename__ = "matched_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    job_uid: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(512), default="")
+    company: Mapped[str] = mapped_column(String(255), default="")
+    url: Mapped[str] = mapped_column(String(1024), default="")
+    source: Mapped[str] = mapped_column(String(32), default="")
+    remote_region: Mapped[str] = mapped_column(String(32), default="")
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    recommendation: Mapped[bool] = mapped_column(Boolean, default=False)
+    reasons: Mapped[str] = mapped_column(Text, default="[]")  # JSON list
+    missing_skills: Mapped[str] = mapped_column(Text, default="[]")  # JSON list
+    applied: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 def _normalize_url(url: str) -> str:
     """Make managed-Postgres URLs work with SQLAlchemy 2.0 + psycopg 3.
 

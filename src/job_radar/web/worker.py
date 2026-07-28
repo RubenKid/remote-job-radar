@@ -13,7 +13,7 @@ from ..common.logger import get_logger, setup_logging
 from ..profile_engine.models import CandidateProfile
 from ..search_engine.pipeline import SearchPipeline
 from .db import Settings, User, init_engine, session_scope
-from .engine_glue import DbHistory, build_user_config
+from .engine_glue import DbHistory, build_user_config, save_matches
 from .settings import WebSettings
 
 logger = get_logger(__name__)
@@ -47,6 +47,8 @@ def run_for_all_users(dry_run: bool = False) -> dict[str, int]:
                     dry_run=dry_run,
                     history=history,
                 )
+                if not dry_run:
+                    save_matches(session, user.id, result.jobs)
                 stats["emailed"] += result.emailed
                 logger.info(
                     "user %s: %d collected -> %d emailed",

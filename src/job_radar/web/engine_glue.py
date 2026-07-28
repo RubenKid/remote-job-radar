@@ -6,14 +6,37 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..common.config import Config
-from .db import SentJob, Settings
+from ..common.models import ScoredJob
+from .db import MatchedJob, SentJob, Settings
 from .security import decrypt_secret
+
+
+def save_matches(session: Session, user_id: int, jobs: list[ScoredJob]) -> None:
+    """Persist the AI-selected jobs so the user can browse them on the dashboard."""
+    for scored in jobs:
+        ev = scored.evaluation
+        session.add(
+            MatchedJob(
+                user_id=user_id,
+                job_uid=scored.job.uid,
+                title=scored.job.title,
+                company=scored.job.company,
+                url=scored.job.url,
+                source=scored.job.source,
+                remote_region=scored.job.remote_region,
+                score=scored.final_score,
+                recommendation=bool(ev and ev.recommendation),
+                reasons=json.dumps(ev.reasons if ev else []),
+                missing_skills=json.dumps(ev.missing_skills if ev else []),
+            )
+        )
 
 
 class DbHistory:
