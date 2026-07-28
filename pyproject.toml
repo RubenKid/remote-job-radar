@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "remote-job-radar"
+version = "0.3.0"
+description = "AI-powered remote job matching from a CV PDF"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "beautifulsoup4>=4.12,<5",
+  "feedparser>=6,<7",
+  "openai>=1.68,<2",
+  "pydantic>=2.10,<3",
+  "PyMuPDF>=1.25,<2",
+  "python-dotenv>=1,<2",
+  "PyYAML>=6,<7",
+  "requests>=2.32,<3",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40,<1"]
+web = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.30,<1",
+  "sqlalchemy>=2.0,<3",
+  "authlib>=1.3,<2",
+  "itsdangerous>=2,<3",
+  "jinja2>=3.1,<4",
+  "python-multipart>=0.0.9",
+  "cryptography>=42",
+  "httpx>=0.27",
+  "psycopg[binary]>=3.2,<4",
+]
+dev = ["pytest>=8,<9", "ruff>=0.9,<1", "httpx>=0.27"]
+
+[project.scripts]
+job-radar = "job_radar.cli:main"
+job-radar-worker = "job_radar.web.worker:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+job_radar = ["web/templates/*.html", "web/static/*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100

@@ -1,0 +1,56 @@
+# No keywords are required. They are generated from the CV.
+#
+# Secrets (API keys, SMTP credentials, recipient email) live in .env — never here.
+# This file only controls behavior.
+
+# AI provider: "openai" or "anthropic" (overridable with AI_PROVIDER in .env)
+provider: openai
+
+# Storage
+profile_file: data/candidate_profile.json
+history_file: data/history.json
+
+# Job sources
+sources:
+  - remotive
+  - weworkremotely
+  - jobicy
+  - remoteok
+  - himalayas
+  - workingnomads
+  - nodesk
+  - euremotejobs
+  - braintrust
+  - themuse   # optional key: set THEMUSE_API_KEY in .env to raise limits
+  - findwork  # requires FINDWORK_API_KEY in .env
+  # Per-company ATS boards (only the remote roles are kept). Edit the lists below.
+  - greenhouse
+  - ashby
+  # - lever   # enable and fill lever_companies to use
+
+# Company boards for the ATS sources above (company slug from the board URL).
+greenhouse_boards:
+  - stripe
+ashby_companies:
+  - ramp
+  - openai
+lever_companies: []
+
+# The Muse: how many pages of remote jobs to pull (20 results/page).
+themuse_max_pages: 3
+
+# Ranking / email tuning
+local_top_n: 25          # how many jobs reach the (paid) AI evaluation
+email_max: 15            # max jobs in the daily digest
+min_score: 60            # drop jobs the AI scores below this (0-100)
+recommended_only: false  # if true, only include jobs the AI recommends applying to
+
+# Remote region preference (higher = better in the local pre-filter)
+remote_regions_priority:
+  - Worldwide
+  - Europe
+  - EMEA
+
+# Networking
+request_timeout: 30
+max_jobs_per_source: 300

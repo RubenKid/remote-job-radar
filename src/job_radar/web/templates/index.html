@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Only the remote jobs worth your time.</h1>
+  <p class="lead">
+    Connect your account, upload your CV once, and get a daily email with the
+    best 100% remote opportunities matched to your experience by AI.
+    No keyword hunting.
+  </p>
+  <a class="btn btn-primary" href="/login">
+    {% if google_enabled %}Continue with Google{% else %}Enter (dev login){% endif %}
+  </a>
+  {% if not google_enabled %}
+  <p class="hint">Google login isn't configured — using local dev login.</p>
+  {% endif %}
+</section>
+
+<section class="steps">
+  <div class="step"><span>1</span><p>Sign in with Google — that email receives your digest.</p></div>
+  <div class="step"><span>2</span><p>Connect your OpenAI or Anthropic key and upload your CV.</p></div>
+  <div class="step"><span>3</span><p>Each day, get a ranked shortlist of new remote jobs.</p></div>
+</section>
+{% endblock %}

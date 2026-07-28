@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Remote Job Radar{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">🛰️ Remote Job Radar</a>
+    <nav>
+      {% if request.session.get('user_id') %}
+        <a href="/dashboard">Dashboard</a>
+        <a href="/logout">Log out</a>
+      {% endif %}
+    </nav>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">100% remote jobs, matched to your CV by AI.</footer>
+</body>
+</html>
