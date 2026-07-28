@@ -1,8 +1,10 @@
 """Fast, free, local pre-filter.
 
-Scores each job by keyword overlap with the candidate profile so we only spend
-LLM tokens on the most promising handful. Also drops explicitly excluded roles
-and de-prioritizes non-preferred remote regions.
+Scores each job by keyword overlap with the candidate profile. A job is only
+kept when a profile term appears in its **title** — the one reliable signal.
+Tags and description count a little (as a capped tie-breaker) but never on their
+own, because aggregator listings keyword-stuff every technology into both tags
+and description, which otherwise floods the results with unrelated roles.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from ...common.models import Job, ScoredJob
 from ...profile_engine.models import CandidateProfile
 
 _WORD_RE = re.compile(r"[a-z0-9+#.]+")
+_SUPPORT_CAP = 3.0  # max total contribution from tags/description matches
 
 
 def _tokens(text: str) -> set[str]:
@@ -33,26 +36,33 @@ def _is_excluded(job: Job, profile: CandidateProfile) -> bool:
     return any(ex.lower() in title for ex in profile.excluded_roles if ex.strip())
 
 
-def _keyword_score(job: Job, profile: CandidateProfile) -> float:
-    """Relevance from profile-term overlap. Zero means "not a match"."""
-    haystack = f"{job.title} {job.company} {' '.join(job.tags)} {job.description}"
-    hay_lower = haystack.lower()
-    hay_tokens = _tokens(haystack)
-    title_tokens = _tokens(job.title)
+def _match_scores(job: Job, profile: CandidateProfile) -> tuple[float, float]:
+    """Return (title, support) scores.
 
-    score = 0.0
+    title = matches in the job title (the reliable signal); support = matches in
+    tags or description (unreliable — aggregators stuff these). A job with
+    title == 0 is not really about the candidate's field.
+    """
+    title_lower = job.title.lower()
+    title_tokens = _tokens(job.title)
+    support_text = " ".join(job.tags) + " " + job.description
+    support_lower = support_text.lower()
+    support_tokens = _tokens(support_text)
+
+    title = 0.0
+    support = 0.0
     for term in _terms(profile):
-        if len(term.split()) == 1:
+        if len(term.split()) == 1:  # single word → token match
             if term in title_tokens:
-                score += 3.0
-            elif term in hay_tokens:
-                score += 1.0
-        else:  # multi-word phrase: match as substring
-            if term in job.title.lower():
-                score += 4.0
-            elif term in hay_lower:
-                score += 1.5
-    return score
+                title += 3.0
+            elif term in support_tokens:
+                support += 1.0
+        else:  # multi-word phrase → substring match
+            if term in title_lower:
+                title += 4.0
+            elif term in support_lower:
+                support += 1.5
+    return title, support
 
 
 def local_filter(
@@ -62,7 +72,6 @@ def local_filter(
     region_priority: list[str],
 ) -> list[ScoredJob]:
     """Return the top ``top_n`` jobs by local relevance score, best first."""
-    # Higher bonus for more-preferred regions (first in the list = best).
     region_bonus = {
         region: float(len(region_priority) - i)
         for i, region in enumerate(region_priority)
@@ -72,10 +81,10 @@ def local_filter(
     for job in jobs:
         if _is_excluded(job, profile):
             continue
-        keyword = _keyword_score(job, profile)
-        if keyword <= 0:  # region preference never rescues an irrelevant job
+        title, support = _match_scores(job, profile)
+        if title <= 0:  # require a TITLE match — kills tag/description keyword-stuffing
             continue
-        total = keyword + region_bonus.get(job.remote_region, 0.0)
+        total = title + min(support, _SUPPORT_CAP) + region_bonus.get(job.remote_region, 0.0)
         scored.append(ScoredJob(job=job, local_score=total))
 
     scored.sort(key=lambda s: s.local_score, reverse=True)
