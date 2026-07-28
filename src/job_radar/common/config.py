@@ -81,6 +81,7 @@ class Config:
     email_max: int = 15
     min_score: int = 0
     recommended_only: bool = False
+    use_ai_ranking: bool = True  # False = free mode: rank by local keyword score only
     remote_regions_priority: list[str] = field(
         default_factory=lambda: ["Worldwide", "Europe", "EMEA"]
     )
@@ -127,6 +128,7 @@ class Config:
         cfg.email_max = int(data.get("email_max", cfg.email_max))
         cfg.min_score = int(data.get("min_score", cfg.min_score))
         cfg.recommended_only = bool(data.get("recommended_only", cfg.recommended_only))
+        cfg.use_ai_ranking = bool(data.get("use_ai_ranking", cfg.use_ai_ranking))
         cfg.remote_regions_priority = list(
             data.get("remote_regions_priority", cfg.remote_regions_priority)
         )

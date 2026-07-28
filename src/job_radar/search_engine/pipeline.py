@@ -81,12 +81,13 @@ class SearchPipeline:
         )
         logger.info("%d jobs shortlisted for AI evaluation", len(shortlist))
 
-        # 5. AI evaluation of the shortlist only.
-        ranker = AIRanker(self.provider)
-        evaluated = ranker.evaluate(shortlist, profile)
-
-        # 6. Select the best for the digest.
-        selected = self._select(evaluated)
+        # 5. Rank. AI evaluation of the shortlist, or local-score-only (free mode).
+        if cfg.use_ai_ranking:
+            evaluated = AIRanker(self.provider).evaluate(shortlist, profile)
+            selected = self._select(evaluated)
+        else:
+            logger.info("AI ranking disabled — using local keyword score only")
+            selected = shortlist[: cfg.email_max]
         logger.info("%d jobs selected for the digest", len(selected))
 
         if not selected:
