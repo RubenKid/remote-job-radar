@@ -8,10 +8,10 @@
     No keyword hunting.
   </p>
   <a class="btn btn-primary" href="/login">
-    {% if google_enabled %}Continue with Google{% else %}Enter (dev login){% endif %}
+    {% if google_enabled %}Continue with Google{% else %}Sign in{% endif %}
   </a>
   {% if not google_enabled %}
-  <p class="hint">Google login isn't configured — using local dev login.</p>
+  <p class="hint">Local mode — each person signs in with their email.</p>
   {% endif %}
 </section>
 

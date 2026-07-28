@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Sign in — Remote Job Radar{% endblock %}
+{% block content %}
+<section class="card" style="max-width:460px;margin:0 auto">
+  <h1 style="font-size:22px;margin:0 0 4px">Sign in</h1>
+  <p class="muted">Local mode — enter your email to use (or create) your account.
+     Each person gets their own CV, settings, and daily digest.</p>
+
+  <form method="post" action="/login">
+    <label>Email
+      <input type="email" name="email" placeholder="you@example.com" required autofocus />
+    </label>
+    <label>Name (optional)
+      <input type="text" name="name" placeholder="Your name" />
+    </label>
+    <button class="btn btn-primary" type="submit">Continue</button>
+  </form>
+
+  {% if users %}
+  <hr />
+  <p class="muted" style="margin:0 0 8px">Switch to an existing account:</p>
+  {% for u in users %}
+  <form method="post" action="/login" style="display:inline">
+    <input type="hidden" name="email" value="{{ u.email }}" />
+    <input type="hidden" name="name" value="{{ u.name }}" />
+    <button class="btn" type="submit" style="margin:0 6px 6px 0">
+      {{ u.name or u.email }}
+    </button>
+  </form>
+  {% endfor %}
+  {% endif %}
+</section>
+{% endblock %}

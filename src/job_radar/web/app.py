@@ -51,6 +51,14 @@ def create_app() -> FastAPI:
         with Session() as session:
             return session.scalar(select(User).where(User.id == uid))
 
+    def _list_local_users() -> list[dict]:
+        Session = get_sessionmaker()
+        with Session() as session:
+            rows = session.scalars(
+                select(User).where(User.google_sub.like("local:%")).order_by(User.email)
+            ).all()
+            return [{"email": u.email, "name": u.name} for u in rows]
+
     def _settings_for(user_id: int) -> Settings:
         Session = get_sessionmaker()
         with Session() as session:
@@ -75,16 +83,28 @@ def create_app() -> FastAPI:
     @app.get("/login")
     async def login(request: Request):
         if oauth is None:
-            # Dev fallback: only allowed on local/dev, never on a public deploy.
+            # Local multi-user login (no Google). Only allowed on local/dev.
             if not web.allow_dev_login:
                 return RedirectResponse(
                     "/?error=Login+is+not+configured", status_code=303
                 )
-            uid = authmod.upsert_user("dev-local", "dev@example.com", "Dev User")
-            authmod.login_session(request, uid)
-            return RedirectResponse("/dashboard", status_code=303)
+            return templates.TemplateResponse(
+                request, "local_login.html", {"users": _list_local_users()}
+            )
         redirect_uri = web.base_url + "/auth/callback"
         return await oauth.google.authorize_redirect(request, redirect_uri)
+
+    @app.post("/login")
+    def local_login(request: Request, email: str = Form(...), name: str = Form("")):
+        # Local accounts, keyed by email. Disabled once Google OAuth is configured.
+        if oauth is not None or not web.allow_dev_login:
+            return RedirectResponse("/", status_code=303)
+        email = email.strip().lower()
+        if not email:
+            return RedirectResponse("/login", status_code=303)
+        uid = authmod.upsert_user(f"local:{email}", email, name.strip() or email)
+        authmod.login_session(request, uid)
+        return RedirectResponse("/dashboard", status_code=303)
 
     @app.get("/auth/callback")
     async def auth_callback(request: Request):

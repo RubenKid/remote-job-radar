@@ -31,7 +31,14 @@ def test_landing_renders(client):
 
 
 def test_login_creates_user_and_settings_persist(client):
-    r = client.get("/login", follow_redirects=True)
+    r = client.get("/login")
+    assert r.status_code == 200 and "Sign in" in r.text
+
+    r = client.post(
+        "/login",
+        data={"email": "alice@example.com", "name": "Alice"},
+        follow_redirects=True,
+    )
     assert r.status_code == 200 and "Dashboard" in r.text
 
     r = client.post(
@@ -58,6 +65,25 @@ def test_secret_encryption_roundtrip():
     assert token != "sk-123"
     assert decrypt_secret(token, "seed") == "sk-123"
     assert decrypt_secret(token, "wrong-seed") == ""
+
+
+def test_local_multi_user(client):
+    # Two distinct people get two distinct local accounts.
+    client.post("/login", data={"email": "a@example.com", "name": "A"}, follow_redirects=True)
+    client.get("/logout")
+    client.post("/login", data={"email": "b@example.com", "name": "B"}, follow_redirects=True)
+
+    # The sign-in page lists both existing accounts to switch between.
+    page = client.get("/login").text
+    assert "a@example.com" in page and "b@example.com" in page
+
+    from sqlalchemy import func, select
+
+    from job_radar.web.db import User, get_sessionmaker
+
+    with get_sessionmaker()() as s:
+        count = s.scalar(select(func.count()).select_from(User))
+    assert count == 2
 
 
 def test_healthz(client):
