@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...common.config import Config
+from .arbeitnow import ArbeitnowCollector
 from .ashby import AshbyCollector
 from .base import Collector
 from .braintrust import BraintrustCollector
@@ -29,6 +30,7 @@ _REGISTRY: dict[str, type[Collector]] = {
     "himalayas": HimalayasCollector,
     "workingnomads": WorkingNomadsCollector,
     "nodesk": NoDeskCollector,
+    "arbeitnow": ArbeitnowCollector,
     "euremotejobs": EuRemoteJobsCollector,
     "braintrust": BraintrustCollector,
     "themuse": TheMuseCollector,
@@ -52,6 +54,7 @@ def build_collectors(config: Config) -> list[Collector]:
 
 
 __all__ = [
+    "ArbeitnowCollector",
     "AshbyCollector",
     "BraintrustCollector",
     "Collector",

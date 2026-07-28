@@ -19,6 +19,7 @@ sources:
   - himalayas
   - workingnomads
   - nodesk
+  - arbeitnow
   - euremotejobs
   - braintrust
   - themuse   # optional key: set THEMUSE_API_KEY in .env to raise limits
@@ -32,6 +33,8 @@ sources:
 # Company boards for the ATS sources above (company slug from the board URL).
 greenhouse_boards:
   - stripe
+  - duolingo   # hires remote iOS/Android
+  - reddit     # remote iOS/Android roles
 ashby_companies:
   - ramp
   - openai
