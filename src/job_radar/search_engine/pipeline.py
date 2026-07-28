@@ -75,18 +75,18 @@ class SearchPipeline:
             logger.info("Nothing new to send today.")
             return PipelineResult(len(raw), 0, 0, 0, [])
 
-        # 4. Cheap local pre-filter → shortlist.
-        shortlist = local_filter(
-            fresh, profile, cfg.local_top_n, cfg.remote_regions_priority
-        )
-        logger.info("%d jobs shortlisted for AI evaluation", len(shortlist))
+        # 4. Local keyword pre-filter. In AI mode we keep a small shortlist to
+        # rank; in free mode we surface everything relevant, up to email_max.
+        cap = cfg.local_top_n if cfg.use_ai_ranking else max(cfg.email_max, cfg.local_top_n)
+        shortlist = local_filter(fresh, profile, cap, cfg.remote_regions_priority)
+        logger.info("%d jobs matched the CV (local filter)", len(shortlist))
 
         # 5. Rank. AI evaluation of the shortlist, or local-score-only (free mode).
         if cfg.use_ai_ranking:
             evaluated = AIRanker(self.provider).evaluate(shortlist, profile)
             selected = self._select(evaluated)
         else:
-            logger.info("AI ranking disabled — using local keyword score only")
+            logger.info("AI ranking disabled — showing all CV keyword matches")
             selected = shortlist[: cfg.email_max]
         logger.info("%d jobs selected for the digest", len(selected))
 

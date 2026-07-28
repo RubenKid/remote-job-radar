@@ -50,7 +50,7 @@ min_score: 60            # drop jobs the AI scores below this (0-100)
 recommended_only: false  # if true, only include jobs the AI recommends applying to
 # AI ranking runs ALL shortlisted jobs in one batched call. To cut cost further,
 # set each user's model to a cheaper one (e.g. claude-haiku-4-5 / gpt-5-mini).
-use_ai_ranking: true     # false = free mode: rank by keyword match only, no AI
+use_ai_ranking: false    # false = free mode: rank by keyword match only, no AI
 
 # Remote region preference (higher = better in the local pre-filter)
 remote_regions_priority:

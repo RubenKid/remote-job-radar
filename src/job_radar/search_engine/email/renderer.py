@@ -33,13 +33,20 @@ def _job_card(scored: ScoredJob) -> str:
         if missing
         else ""
     )
+    # Only show the numeric score when the AI produced an evaluation (reasons);
+    # in free mode the local keyword score isn't a 0-100 fit and would mislead.
+    score_html = (
+        f'<span style="font-weight:700;font-size:16px;color:{_score_color(score)}">{score}</span>'
+        if reasons
+        else ""
+    )
     return f"""\
 <div style="border:1px solid #d0d7de;border-radius:10px;padding:16px;margin:0 0 14px">
   <div style="display:flex;justify-content:space-between;align-items:baseline">
     <h3 style="margin:0;font-size:17px">
       <a href="{_esc(job.url)}" style="color:#0969da;text-decoration:none">{_esc(job.title)}</a>
     </h3>
-    <span style="font-weight:700;font-size:16px;color:{_score_color(score)}">{score}</span>
+    {score_html}
   </div>
   <p style="margin:4px 0 8px;color:#57606a;font-size:14px">
     {_esc(job.company)} &middot; {_esc(job.remote_region)}
@@ -85,7 +92,8 @@ def render_digest(jobs: list[ScoredJob], profile_summary: str = "") -> tuple[str
     text_lines = [f"Remote Job Radar — {heading}", ""]
     for s in jobs:
         j = s.job
-        text_lines.append(f"[{s.final_score}] {j.title} — {j.company} ({j.remote_region})")
+        prefix = f"[{s.final_score}] " if (s.evaluation and s.evaluation.reasons) else ""
+        text_lines.append(f"{prefix}{j.title} — {j.company} ({j.remote_region})")
         if s.evaluation:
             for r in s.evaluation.reasons:
                 text_lines.append(f"  - {r}")
