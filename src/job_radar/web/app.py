@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hmac
+import threading
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -217,5 +219,16 @@ def create_app() -> FastAPI:
     @app.get("/healthz")
     def healthz():
         return {"status": "ok"}
+
+    # Daily digest trigger for an external free cron (e.g. cron-job.org).
+    # Runs the worker for all users in the background so the request returns fast.
+    @app.api_route("/tasks/run-daily", methods=["GET", "POST"])
+    def run_daily(token: str = ""):
+        if not web.cron_token or not hmac.compare_digest(token, web.cron_token):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
+        from .worker import run_for_all_users
+
+        threading.Thread(target=run_for_all_users, daemon=True).start()
+        return JSONResponse({"status": "started"})
 
     return app

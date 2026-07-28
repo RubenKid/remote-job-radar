@@ -62,3 +62,27 @@ def test_secret_encryption_roundtrip():
 
 def test_healthz(client):
     assert client.get("/healthz").json() == {"status": "ok"}
+
+
+def test_run_daily_requires_token(client):
+    # No CRON_TOKEN configured in the test env -> always unauthorized.
+    r = client.get("/tasks/run-daily")
+    assert r.status_code == 403
+    r = client.get("/tasks/run-daily", params={"token": "guessing"})
+    assert r.status_code == 403
+
+
+def test_dev_login_blocked_when_not_allowed(tmp_path, monkeypatch):
+    # A non-local BASE_URL with no Google creds must NOT allow dev login.
+    monkeypatch.setenv("APP_SECRET_KEY", "test-secret")
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path/'app2.db'}")
+    monkeypatch.setenv("BASE_URL", "https://example.com")
+    monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
+    monkeypatch.delenv("GOOGLE_CLIENT_SECRET", raising=False)
+    monkeypatch.delenv("ALLOW_DEV_LOGIN", raising=False)
+    from job_radar.web.app import create_app
+
+    c = TestClient(create_app())
+    r = c.get("/login", follow_redirects=False)
+    assert r.status_code == 303
+    assert "error" in r.headers["location"]

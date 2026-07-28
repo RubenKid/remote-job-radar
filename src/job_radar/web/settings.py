@@ -19,6 +19,7 @@ class WebSettings:
     google_client_id: str = ""
     google_client_secret: str = ""
     allow_dev_login: bool = True
+    cron_token: str = ""  # guards the /tasks/run-daily trigger endpoint
 
     @classmethod
     def load(cls) -> WebSettings:
@@ -43,6 +44,7 @@ class WebSettings:
             google_client_id=os.environ.get("GOOGLE_CLIENT_ID", ""),
             google_client_secret=os.environ.get("GOOGLE_CLIENT_SECRET", ""),
             allow_dev_login=allow_dev_login,
+            cron_token=os.environ.get("CRON_TOKEN", ""),
         )
 
     @property
