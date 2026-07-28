@@ -62,8 +62,8 @@ lever_companies: []
 # The Muse: how many pages of remote jobs to pull (20 results/page).
 themuse_max_pages: 3
 
-# SerpAPI Google Jobs query (kept simple to conserve the free-tier quota).
-serpapi_query: remote
+# SerpAPI Google Jobs query (taps Indeed/LinkedIn/Google). One call/day.
+serpapi_query: remote iOS OR Android OR mobile engineer OR react native OR flutter
 
 # Ranking / email tuning
 local_top_n: 25          # how many jobs reach the (paid) AI evaluation
