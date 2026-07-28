@@ -33,10 +33,11 @@ class AnthropicProvider(LLMProvider):
         self._model = model
 
     def complete_json(self, *, system: str, user: str, max_tokens: int = 4096) -> dict[str, Any]:
+        # No `thinking` param: it's unnecessary for structured JSON extraction and
+        # adaptive thinking isn't supported on Haiku (our default cheap model).
         response = self._client.messages.create(
             model=self._model,
             max_tokens=max_tokens,
-            thinking={"type": "adaptive"},
             system=system + _JSON_GUARD,
             messages=[{"role": "user", "content": user}],
         )
