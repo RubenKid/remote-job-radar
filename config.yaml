@@ -31,13 +31,32 @@ sources:
   # - lever   # enable and fill lever_companies to use
 
 # Company boards for the ATS sources above (company slug from the board URL).
+# Startup / scale-up boards (remote-friendly). Edit freely.
 greenhouse_boards:
   - stripe
-  - duolingo   # hires remote iOS/Android
-  - reddit     # remote iOS/Android roles
+  - reddit
+  - duolingo
+  - gitlab
+  - coinbase
+  - affirm
+  - samsara
+  - dropbox
+  - webflow
+  - databricks
+  - discord
+  - gusto
 ashby_companies:
   - ramp
   - openai
+  - linear
+  - replit
+  - supabase
+  - resend
+  - baseten
+  - cohere
+  - perplexity
+  - watershed
+  - posthog
 lever_companies: []
 
 # The Muse: how many pages of remote jobs to pull (20 results/page).
