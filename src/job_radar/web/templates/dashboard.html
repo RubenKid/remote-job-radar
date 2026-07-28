@@ -29,14 +29,6 @@
       <label>Send to
         <input type="email" name="digest_email" value="{{ settings.digest_email }}" required />
       </label>
-      <div class="row">
-        <label>Min score
-          <input type="number" name="min_score" min="0" max="100" value="{{ settings.min_score }}" />
-        </label>
-        <label>Max jobs
-          <input type="number" name="email_max" min="1" max="50" value="{{ settings.email_max }}" />
-        </label>
-      </div>
       <label class="check">
         <input type="checkbox" name="enabled" value="true" {% if settings.enabled %}checked{% endif %} />
         Enabled — send me the daily digest

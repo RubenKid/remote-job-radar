@@ -197,8 +197,6 @@ def create_app() -> FastAPI:
         provider: str = Form("openai"),
         api_key: str = Form(""),
         digest_email: str = Form(""),
-        min_score: int = Form(60),
-        email_max: int = Form(15),
         enabled: bool = Form(False),
     ):
         uid = authmod.current_user_id(request)
@@ -211,8 +209,6 @@ def create_app() -> FastAPI:
                 session.add(s)
             s.provider = provider
             s.digest_email = digest_email.strip()
-            s.min_score = max(0, min(100, min_score))
-            s.email_max = max(1, email_max)
             s.enabled = enabled
             if api_key.strip():  # only overwrite when a new key is supplied
                 s.api_key_encrypted = encrypt_secret(api_key.strip(), web.app_secret_key)

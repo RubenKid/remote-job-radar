@@ -23,6 +23,9 @@ from .ranking import AIRanker, local_filter
 
 logger = get_logger(__name__)
 
+# Safety cap for free (no-AI) mode so a runaway profile can't email thousands.
+_NO_AI_LIMIT = 500
+
 
 @dataclass
 class PipelineResult:
@@ -76,8 +79,8 @@ class SearchPipeline:
             return PipelineResult(len(raw), 0, 0, 0, [])
 
         # 4. Local keyword pre-filter. In AI mode we keep a small shortlist to
-        # rank; in free mode we surface everything relevant, up to email_max.
-        cap = cfg.local_top_n if cfg.use_ai_ranking else max(cfg.email_max, cfg.local_top_n)
+        # rank; in free mode we surface every CV match (no min_score, no cap).
+        cap = cfg.local_top_n if cfg.use_ai_ranking else _NO_AI_LIMIT
         shortlist = local_filter(fresh, profile, cap, cfg.remote_regions_priority)
         logger.info("%d jobs matched the CV (local filter)", len(shortlist))
 
@@ -86,8 +89,8 @@ class SearchPipeline:
             evaluated = AIRanker(self.provider).evaluate(shortlist, profile)
             selected = self._select(evaluated)
         else:
-            logger.info("AI ranking disabled — showing all CV keyword matches")
-            selected = shortlist[: cfg.email_max]
+            logger.info("AI ranking disabled — showing all %d CV matches", len(shortlist))
+            selected = shortlist
         logger.info("%d jobs selected for the digest", len(selected))
 
         if not selected:
