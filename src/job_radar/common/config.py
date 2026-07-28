@@ -77,6 +77,12 @@ class Config:
     # SerpAPI / Google Jobs (requires a key; free tier ~100 searches/month).
     serpapi_api_key: str = ""
     serpapi_query: str = "remote"
+    # Upwork (OAuth2: needs a one-time browser auth to get a refresh token).
+    upwork_client_id: str = ""
+    upwork_client_secret: str = ""
+    upwork_refresh_token: str = ""
+    upwork_redirect_uri: str = "https://localhost/callback"
+    upwork_query: str = "mobile developer"
     local_top_n: int = 25
     email_max: int = 15
     min_score: int = 0
@@ -124,6 +130,7 @@ class Config:
         cfg.themuse_max_pages = int(data.get("themuse_max_pages", cfg.themuse_max_pages))
         cfg.findwork_max_pages = int(data.get("findwork_max_pages", cfg.findwork_max_pages))
         cfg.serpapi_query = str(data.get("serpapi_query", cfg.serpapi_query))
+        cfg.upwork_query = str(data.get("upwork_query", cfg.upwork_query))
         cfg.local_top_n = int(data.get("local_top_n", cfg.local_top_n))
         cfg.email_max = int(data.get("email_max", cfg.email_max))
         cfg.min_score = int(data.get("min_score", cfg.min_score))
@@ -148,6 +155,10 @@ class Config:
         cfg.themuse_api_key = _env("THEMUSE_API_KEY")
         cfg.findwork_api_key = _env("FINDWORK_API_KEY")
         cfg.serpapi_api_key = _env("SERPAPI_API_KEY")
+        cfg.upwork_client_id = _env("UPWORK_CLIENT_ID")
+        cfg.upwork_client_secret = _env("UPWORK_CLIENT_SECRET")
+        cfg.upwork_refresh_token = _env("UPWORK_REFRESH_TOKEN")
+        cfg.upwork_redirect_uri = _env("UPWORK_REDIRECT_URI") or cfg.upwork_redirect_uri
 
         cfg.smtp_host = _env("SMTP_HOST") or cfg.smtp_host
         cfg.smtp_port = _env_int("SMTP_PORT", cfg.smtp_port)

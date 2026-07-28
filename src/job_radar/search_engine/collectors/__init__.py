@@ -17,6 +17,7 @@ from .remoteok import RemoteOkCollector
 from .remotive import RemotiveCollector
 from .serpapi import SerpApiCollector
 from .themuse import TheMuseCollector
+from .upwork import UpworkCollector
 from .weworkremotely import WeWorkRemotelyCollector
 from .workingnomads import WorkingNomadsCollector
 
@@ -36,6 +37,7 @@ _REGISTRY: dict[str, type[Collector]] = {
     "greenhouse": GreenhouseCollector,
     "lever": LeverCollector,
     "ashby": AshbyCollector,
+    "upwork": UpworkCollector,
 }
 
 
@@ -64,6 +66,7 @@ __all__ = [
     "RemotiveCollector",
     "SerpApiCollector",
     "TheMuseCollector",
+    "UpworkCollector",
     "WeWorkRemotelyCollector",
     "WorkingNomadsCollector",
     "build_collectors",
