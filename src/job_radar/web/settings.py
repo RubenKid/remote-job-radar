@@ -18,6 +18,7 @@ class WebSettings:
 
     google_client_id: str = ""
     google_client_secret: str = ""
+    allow_dev_login: bool = True
 
     @classmethod
     def load(cls) -> WebSettings:
@@ -27,12 +28,21 @@ class WebSettings:
             load_dotenv()
         except ImportError:  # pragma: no cover
             pass
+        base_url = os.environ.get("BASE_URL", cls.base_url).rstrip("/")
+        is_local = "localhost" in base_url or "127.0.0.1" in base_url
+        dev_login_env = os.environ.get("ALLOW_DEV_LOGIN")
+        allow_dev_login = (
+            dev_login_env.lower() in ("1", "true", "yes")
+            if dev_login_env is not None
+            else is_local
+        )
         return cls(
             database_url=os.environ.get("DATABASE_URL", cls.database_url),
             app_secret_key=os.environ.get("APP_SECRET_KEY", cls.app_secret_key),
-            base_url=os.environ.get("BASE_URL", cls.base_url).rstrip("/"),
+            base_url=base_url,
             google_client_id=os.environ.get("GOOGLE_CLIENT_ID", ""),
             google_client_secret=os.environ.get("GOOGLE_CLIENT_SECRET", ""),
+            allow_dev_login=allow_dev_login,
         )
 
     @property

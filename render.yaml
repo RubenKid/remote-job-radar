@@ -37,6 +37,8 @@ services:
         sync: false # optional
       - key: FINDWORK_API_KEY
         sync: false # optional
+      - key: SERPAPI_API_KEY
+        sync: false # optional
 
   - type: cron
     name: job-radar-daily
@@ -66,4 +68,6 @@ services:
       - key: THEMUSE_API_KEY
         sync: false # optional
       - key: FINDWORK_API_KEY
+        sync: false # optional
+      - key: SERPAPI_API_KEY
         sync: false # optional

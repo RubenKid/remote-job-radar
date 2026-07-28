@@ -73,7 +73,11 @@ def create_app() -> FastAPI:
     @app.get("/login")
     async def login(request: Request):
         if oauth is None:
-            # Dev fallback: no Google creds configured.
+            # Dev fallback: only allowed on local/dev, never on a public deploy.
+            if not web.allow_dev_login:
+                return RedirectResponse(
+                    "/?error=Login+is+not+configured", status_code=303
+                )
             uid = authmod.upsert_user("dev-local", "dev@example.com", "Dev User")
             authmod.login_session(request, uid)
             return RedirectResponse("/dashboard", status_code=303)
