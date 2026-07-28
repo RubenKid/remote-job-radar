@@ -195,7 +195,6 @@ def create_app() -> FastAPI:
     def save_settings(
         request: Request,
         provider: str = Form("openai"),
-        model: str = Form(""),
         api_key: str = Form(""),
         digest_email: str = Form(""),
         min_score: int = Form(60),
@@ -211,7 +210,6 @@ def create_app() -> FastAPI:
                 s = Settings(user_id=uid)
                 session.add(s)
             s.provider = provider
-            s.model = model.strip()
             s.digest_email = digest_email.strip()
             s.min_score = max(0, min(100, min_score))
             s.email_max = max(1, email_max)

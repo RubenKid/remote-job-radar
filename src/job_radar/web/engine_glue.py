@@ -66,6 +66,10 @@ class DbHistory:
         self._session.flush()
 
 
+# Always use the cheapest model per provider — the model is not user-selectable.
+CHEAPEST_MODEL = {"openai": "gpt-5-mini", "anthropic": "claude-haiku-4-5"}
+
+
 def build_user_config(base: Config, settings: Settings, app_secret: str) -> Config:
     """Clone the app-level base config with this user's provider + recipient."""
     api_key = decrypt_secret(settings.api_key_encrypted, app_secret)
@@ -77,10 +81,8 @@ def build_user_config(base: Config, settings: Settings, app_secret: str) -> Conf
     }
     if settings.provider == "anthropic":
         overrides["anthropic_api_key"] = api_key
-        if settings.model:
-            overrides["anthropic_model"] = settings.model
+        overrides["anthropic_model"] = CHEAPEST_MODEL["anthropic"]
     else:
         overrides["openai_api_key"] = api_key
-        if settings.model:
-            overrides["openai_model"] = settings.model
+        overrides["openai_model"] = CHEAPEST_MODEL["openai"]
     return replace(base, **overrides)

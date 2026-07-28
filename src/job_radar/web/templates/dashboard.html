@@ -17,9 +17,9 @@
           <option value="anthropic" {% if settings.provider == 'anthropic' %}selected{% endif %}>Anthropic (Claude)</option>
         </select>
       </label>
-      <label>Model (optional)
-        <input type="text" name="model" value="{{ settings.model }}" placeholder="gpt-5-mini / claude-opus-4-8" />
-      </label>
+      <p class="muted" style="font-size:13px;margin:8px 0 0">
+        Uses the cheapest model automatically (Haiku / gpt-5-mini) to keep cost low.
+      </p>
       <label>API key
         <input type="password" name="api_key"
                placeholder="{% if settings.has_api_key %}•••••• (saved — leave blank to keep){% else %}sk-...{% endif %}" />
