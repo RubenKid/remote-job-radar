@@ -40,10 +40,13 @@ class SerpApiCollector(Collector):
             location = item.get("location", "") or ""
             detected = item.get("detected_extensions") or {}
             work_from_home = bool(detected.get("work_from_home"))
-            if not title or not is_remote(location):
+            ext_text = " ".join(str(e) for e in (item.get("extensions") or []))
+            desc = item.get("description", "") or ""
+            # Reject anything that signals hybrid/onsite (in location, title, or text).
+            if not title or not is_remote(location, title, ext_text, desc[:400]):
                 continue
             # Keep only genuinely-remote roles.
-            if not work_from_home and not mentions_remote(location, title):
+            if not work_from_home and not mentions_remote(location, title, ext_text):
                 continue
             url = self._best_link(item)
             jobs.append(

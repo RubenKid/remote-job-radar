@@ -35,6 +35,10 @@ class AshbyCollector(Collector):
         for item in payload.get("jobs", []):
             if not item.get("isRemote") or item.get("isListed") is False:
                 continue
+            # isRemote is True even for Hybrid roles — require a Remote workplace type.
+            workplace = (item.get("workplaceType") or "").lower()
+            if workplace and workplace != "remote":
+                continue
             title = (item.get("title") or "").strip()
             location = item.get("location", "") or ""
             if not title:
