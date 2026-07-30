@@ -26,6 +26,9 @@ sources:
   - findwork  # requires FINDWORK_API_KEY in .env
   - serpapi   # Google Jobs; requires SERPAPI_API_KEY (free tier ~100 searches/mo)
   - upwork    # freelance gigs; per-user OAuth (Connect Upwork in the dashboard)
+  # - linkedin  # LinkedIn via Google Jobs — off by default: LinkedIn is largely
+  #             # de-indexed from Google for Jobs, so it burns SerpAPI quota for
+  #             # ~0 results. Enable only if your region/queries surface LinkedIn.
   # Per-company ATS boards (only the remote roles are kept). Edit the lists below.
   - greenhouse
   - ashby

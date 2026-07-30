@@ -49,6 +49,7 @@ _SOURCE_LABELS = {
     "themuse": "The Muse",
     "findwork": "Findwork",
     "serpapi": "Google Jobs (Indeed/LinkedIn)",
+    "linkedin": "LinkedIn (via Google Jobs)",
     "greenhouse": "Startups — Greenhouse",
     "ashby": "Startups — Ashby",
     "lever": "Startups — Lever",
