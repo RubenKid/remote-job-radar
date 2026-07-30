@@ -126,6 +126,7 @@ class MatchedJob(Base):
     missing_skills: Mapped[str] = mapped_column(Text, default="[]")  # JSON list
     published_at: Mapped[str] = mapped_column(String(40), default="")  # raw source date
     applied: Mapped[bool] = mapped_column(Boolean, default=False)
+    dismissed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
@@ -148,20 +149,20 @@ def _ensure_columns(engine) -> None:
 
     insp = inspect(engine)
     tables = set(insp.get_table_names())
+    # (table, column, "TYPE DEFAULT ...") for columns added after first creation.
     wanted = [
-        ("matched_jobs", "published_at", "VARCHAR"),
-        ("settings", "upwork_refresh_token_encrypted", "TEXT"),
-        ("settings", "disabled_sources", "TEXT"),
+        ("matched_jobs", "published_at", "VARCHAR DEFAULT ''"),
+        ("matched_jobs", "dismissed", "BOOLEAN DEFAULT FALSE"),
+        ("settings", "upwork_refresh_token_encrypted", "TEXT DEFAULT ''"),
+        ("settings", "disabled_sources", "TEXT DEFAULT '[]'"),
     ]
-    for table, col, coltype in wanted:
+    for table, col, ddl in wanted:
         if table not in tables:
             continue
         cols = {c["name"] for c in insp.get_columns(table)}
         if col not in cols:
             with engine.begin() as conn:
-                conn.execute(
-                    text(f"ALTER TABLE {table} ADD COLUMN {col} {coltype} DEFAULT ''")
-                )
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}"))
 
 
 def init_engine(database_url: str) -> None:

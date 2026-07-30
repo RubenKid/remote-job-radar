@@ -14,7 +14,7 @@ from fastapi import FastAPI, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import func, select
 from starlette.middleware.sessions import SessionMiddleware
 
 from ..common.config import Config
@@ -95,14 +95,17 @@ def create_app() -> FastAPI:
             session.expunge(s)
             return s
 
-    def _matches_for(user_id: int, limit: int = 300) -> list[dict]:
+    def _matches_for(user_id: int, show: str = "active", limit: int = 300) -> list[dict]:
         Session = get_sessionmaker()
         with Session() as session:
-            rows = session.scalars(
-                select(MatchedJob)
-                .where(MatchedJob.user_id == user_id)
-                .limit(limit)
-            ).all()
+            q = select(MatchedJob).where(MatchedJob.user_id == user_id)
+            if show == "applied":
+                q = q.where(MatchedJob.applied.is_(True), MatchedJob.dismissed.is_(False))
+            elif show == "dismissed":
+                q = q.where(MatchedJob.dismissed.is_(True))
+            elif show != "all":  # "active" (default)
+                q = q.where(MatchedJob.dismissed.is_(False), MatchedJob.applied.is_(False))
+            rows = session.scalars(q.limit(limit)).all()
             items = [
                 {
                     "id": m.id,
@@ -114,6 +117,7 @@ def create_app() -> FastAPI:
                     "score": m.score,
                     "recommendation": m.recommendation,
                     "applied": m.applied,
+                    "dismissed": m.dismissed,
                     "posted": humanize_age(m.published_at),
                     "_dt": parse_date(m.published_at),
                     "reasons": json.loads(m.reasons or "[]"),
@@ -121,12 +125,25 @@ def create_app() -> FastAPI:
                 }
                 for m in rows
             ]
-            # Not-applied first, then newest posting first (unknown dates last).
             epoch = datetime(1970, 1, 1, tzinfo=UTC)
             items.sort(key=lambda x: (x["applied"], -(x["_dt"] or epoch).timestamp()))
             for x in items:
                 del x["_dt"]
             return items
+
+    def _match_counts(user_id: int) -> dict:
+        Session = get_sessionmaker()
+        with Session() as session:
+            def n(*conds):
+                return session.scalar(
+                    select(func.count()).select_from(MatchedJob)
+                    .where(MatchedJob.user_id == user_id, *conds)
+                ) or 0
+            return {
+                "active": n(MatchedJob.dismissed.is_(False), MatchedJob.applied.is_(False)),
+                "applied": n(MatchedJob.applied.is_(True), MatchedJob.dismissed.is_(False)),
+                "dismissed": n(MatchedJob.dismissed.is_(True)),
+            }
 
     # ----- Landing -----
     @app.get("/", response_class=HTMLResponse)
@@ -196,18 +213,22 @@ def create_app() -> FastAPI:
 
     # ----- Dashboard (jobs first) -----
     @app.get("/dashboard", response_class=HTMLResponse)
-    def dashboard(request: Request, msg: str = "", error: str = ""):
+    def dashboard(request: Request, show: str = "active", msg: str = "", error: str = ""):
         user = _load_user(request)
         if user is None:
             return RedirectResponse("/", status_code=303)
         settings = _settings_for(user.id)
+        if show not in ("active", "applied", "dismissed", "all"):
+            show = "active"
         return templates.TemplateResponse(
             request,
             "dashboard.html",
             {
                 "user": user,
                 "settings": settings,
-                "matches": _matches_for(user.id),
+                "matches": _matches_for(user.id, show),
+                "counts": _match_counts(user.id),
+                "show": show,
                 "msg": msg,
                 "error": error,
             },
@@ -256,7 +277,7 @@ def create_app() -> FastAPI:
         return RedirectResponse("/settings?msg=Sources+updated", status_code=303)
 
     @app.post("/jobs/{match_id}/applied")
-    def toggle_applied(request: Request, match_id: int):
+    def toggle_applied(request: Request, match_id: int, show: str = "active"):
         uid = authmod.current_user_id(request)
         if uid is None:
             return RedirectResponse("/", status_code=303)
@@ -264,7 +285,18 @@ def create_app() -> FastAPI:
             match = session.get(MatchedJob, match_id)
             if match is not None and match.user_id == uid:
                 match.applied = not match.applied
-        return RedirectResponse("/dashboard#matches", status_code=303)
+        return RedirectResponse(f"/dashboard?show={show}", status_code=303)
+
+    @app.post("/jobs/{match_id}/dismiss")
+    def toggle_dismiss(request: Request, match_id: int, show: str = "active"):
+        uid = authmod.current_user_id(request)
+        if uid is None:
+            return RedirectResponse("/", status_code=303)
+        with session_scope() as session:
+            match = session.get(MatchedJob, match_id)
+            if match is not None and match.user_id == uid:
+                match.dismissed = not match.dismissed
+        return RedirectResponse(f"/dashboard?show={show}", status_code=303)
 
     # ----- Settings -----
     @app.post("/settings")
@@ -311,6 +343,27 @@ def create_app() -> FastAPI:
             profile.search_terms = terms
             s.profile_json = profile.model_dump_json()
         return RedirectResponse("/settings?msg=Keywords+updated", status_code=303)
+
+    @app.post("/exclusions")
+    def save_exclusions(request: Request, exclusions: str = Form("")):
+        uid = authmod.current_user_id(request)
+        if uid is None:
+            return RedirectResponse("/", status_code=303)
+        words: list[str] = []
+        seen: set[str] = set()
+        for raw in re.split(r"[,\n]", exclusions):
+            w = raw.strip()
+            if w and w.lower() not in seen:
+                seen.add(w.lower())
+                words.append(w)
+        with session_scope() as session:
+            s = session.scalar(select(Settings).where(Settings.user_id == uid))
+            if s is None or not s.profile_json:
+                return RedirectResponse("/settings?error=Upload+a+CV+first", status_code=303)
+            profile = CandidateProfile.model_validate_json(s.profile_json)
+            profile.excluded_roles = words
+            s.profile_json = profile.model_dump_json()
+        return RedirectResponse("/settings?msg=Exclusions+updated", status_code=303)
 
     # ----- CV upload -> profile -----
     @app.post("/cv")

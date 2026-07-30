@@ -50,6 +50,14 @@
         <textarea name="keywords" rows="3">{{ profile.search_terms|join(', ') }}</textarea>
         <button class="btn" type="submit">Save keywords</button>
       </form>
+      <h2>Exclude words</h2>
+      <p class="muted" style="font-size:13px;margin:0 0 6px">
+        Any job whose title contains one of these is hidden (e.g.
+        <em>manager, senior, crypto</em>). Comma-separated.</p>
+      <form method="post" action="/exclusions">
+        <textarea name="exclusions" rows="2">{{ profile.excluded_roles|join(', ') }}</textarea>
+        <button class="btn" type="submit">Save exclusions</button>
+      </form>
     {% else %}
       <p class="muted">Upload your CV (PDF). Requires an API key first.</p>
     {% endif %}

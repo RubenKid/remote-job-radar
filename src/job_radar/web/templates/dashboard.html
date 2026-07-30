@@ -23,6 +23,14 @@
 </div>
 {% endif %}
 
+<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+  {% set tabs = [('active','Active',counts.active),('applied','Applied',counts.applied),('dismissed','Dismissed',counts.dismissed),('all','All',counts.active+counts.applied+counts.dismissed)] %}
+  {% for key, label, cnt in tabs %}
+  <a href="/dashboard?show={{ key }}" class="btn"
+     style="{% if show == key %}background:#0969da;color:#fff;border-color:#0969da{% endif %}">{{ label }} ({{ cnt }})</a>
+  {% endfor %}
+</div>
+
 <section id="matches" style="margin-top:16px">
   {% if not matches %}
     <p class="muted">No jobs yet. Once you're set up, hit <strong>Refresh now</strong>
@@ -54,7 +62,12 @@
       <a class="btn btn-primary" href="{{ j.url }}" target="_blank" rel="noopener"
          style="margin-right:8px">Apply →</a>
       <form method="post" action="/jobs/{{ j.id }}/applied" style="display:inline">
-        <button class="btn" type="submit">{{ "Mark as not applied" if j.applied else "Mark as applied" }}</button>
+        <input type="hidden" name="show" value="{{ show }}" />
+        <button class="btn" type="submit">{{ "Not applied" if j.applied else "Applied ✓" }}</button>
+      </form>
+      <form method="post" action="/jobs/{{ j.id }}/dismiss" style="display:inline">
+        <input type="hidden" name="show" value="{{ show }}" />
+        <button class="btn" type="submit">{{ "Restore" if j.dismissed else "Dismiss" }}</button>
       </form>
     </div>
     {% endfor %}

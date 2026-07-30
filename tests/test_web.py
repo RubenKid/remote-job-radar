@@ -145,6 +145,35 @@ def test_source_toggle_and_effective_sources(client):
     assert "upwork" not in eff  # not connected -> off
 
 
+def test_dismiss_filter_and_exclusions(client):
+
+    from sqlalchemy import select
+
+    from job_radar.profile_engine.models import CandidateProfile
+    from job_radar.web.db import MatchedJob, Settings, User, get_sessionmaker
+
+    client.post("/login", data={"email": "d@x.com", "name": "D"}, follow_redirects=True)
+    with get_sessionmaker()() as s:
+        uid = s.scalar(select(User.id))
+        s.get(Settings, uid).profile_json = CandidateProfile().model_dump_json()
+        s.add(MatchedJob(user_id=uid, job_uid="t:1", title="iOS Engineer", company="Acme",
+                         url="https://e/1", source="jobicy"))
+        s.commit()
+        mid = s.scalar(select(MatchedJob.id))
+
+    # Active tab shows it; dismiss it; then active hides it, dismissed shows it.
+    assert "iOS Engineer" in client.get("/dashboard?show=active").text
+    client.post(f"/jobs/{mid}/dismiss", data={"show": "active"}, follow_redirects=True)
+    assert "iOS Engineer" not in client.get("/dashboard?show=active").text
+    assert "iOS Engineer" in client.get("/dashboard?show=dismissed").text
+
+    # Exclusions persist into the profile.
+    client.post("/exclusions", data={"exclusions": "manager, crypto"}, follow_redirects=True)
+    with get_sessionmaker()() as s:
+        prof = CandidateProfile.model_validate_json(s.get(Settings, uid).profile_json)
+    assert prof.excluded_roles == ["manager", "crypto"]
+
+
 def test_healthz(client):
     assert client.get("/healthz").json() == {"status": "ok"}
 
