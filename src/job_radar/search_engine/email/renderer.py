@@ -69,9 +69,18 @@ def _job_card(scored: ScoredJob) -> str:
 def render_digest(jobs: list[ScoredJob], profile_summary: str = "") -> tuple[str, str]:
     """Return (html_body, text_body) for the digest email."""
     count = len(jobs)
-    heading = f"{count} new remote {'opportunity' if count == 1 else 'opportunities'}"
+    if count == 0:
+        heading = "No new remote jobs today"
+    else:
+        heading = f"{count} new remote {'opportunity' if count == 1 else 'opportunities'}"
 
     cards = "".join(_job_card(s) for s in jobs)
+    if count == 0:
+        cards = (
+            '<div style="border:1px solid #d0d7de;border-radius:10px;padding:16px;'
+            'color:#57606a">Nothing new matched your profile today — we\'ll keep '
+            "looking and email you as soon as new roles appear.</div>"
+        )
     intro = (
         f'<p style="color:#57606a;font-size:14px;margin:0 0 16px">{_esc(profile_summary)}</p>'
         if profile_summary

@@ -87,7 +87,12 @@ class SearchPipeline:
 
     def __init__(self, config: Config, provider: LLMProvider | None = None) -> None:
         self.config = config
-        self.provider = provider or get_provider(config)
+        self._provider = provider  # created lazily; only needed for AI ranking
+
+    def _provider_or_create(self) -> LLMProvider:
+        if self._provider is None:
+            self._provider = get_provider(self.config)
+        return self._provider
 
     def run(
         self,
@@ -127,35 +132,30 @@ class SearchPipeline:
         fresh = [j for j in deduped if j.uid in new_uids]
         logger.info("%d new jobs after history filter", len(fresh))
 
-        if not fresh:
-            logger.info("Nothing new to send today.")
-            return PipelineResult(len(raw), 0, 0, 0, [])
-
-        # 4. Local keyword pre-filter. In AI mode we keep a small shortlist to
-        # rank; in free mode we surface every CV match (no min_score, no cap).
+        # 4. Local keyword pre-filter (empty if nothing new). AI mode keeps a
+        # small shortlist; free mode surfaces every CV match.
         cap = cfg.local_top_n if cfg.use_ai_ranking else _NO_AI_LIMIT
         shortlist = local_filter(fresh, profile, cap, cfg.remote_regions_priority)
         logger.info("%d jobs matched the CV (local filter)", len(shortlist))
 
         # 5. Rank. AI evaluation of the shortlist, or local-score-only (free mode).
-        if cfg.use_ai_ranking:
-            evaluated = AIRanker(self.provider).evaluate(shortlist, profile)
+        if shortlist and cfg.use_ai_ranking:
+            evaluated = AIRanker(self._provider_or_create()).evaluate(shortlist, profile)
             selected = self._select(evaluated)
         else:
-            logger.info("AI ranking disabled — showing all %d CV matches", len(shortlist))
             selected = _sort_by_recency(shortlist)
         logger.info("%d jobs selected for the digest", len(selected))
 
-        if not selected:
-            logger.info("No jobs cleared the quality bar today.")
-            return PipelineResult(len(raw), len(fresh), len(shortlist), 0, [])
-
-        # 7. Render + send.
+        # 6. Always send a digest — even with 0 jobs (a "nothing new today" note).
         if dry_run:
             logger.info("Dry run: skipping email send.")
         else:
             html_body, text_body = render_digest(selected, profile.summary)
-            subject = f"🛰️ {len(selected)} new remote jobs for you"
+            subject = (
+                f"🛰️ {len(selected)} new remote jobs for you"
+                if selected
+                else "🛰️ No new remote jobs today"
+            )
             EmailSender(cfg).send(
                 to=to, subject=subject, html_body=html_body, text_body=text_body
             )
