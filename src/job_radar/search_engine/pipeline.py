@@ -7,10 +7,12 @@ and history namespace and the same engine serves the future web layer.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from ..common.config import Config
+from ..common.dates import age_days, parse_date
 from ..common.logger import get_logger
 from ..common.models import Job, ScoredJob
 from ..profile_engine.models import CandidateProfile
@@ -25,6 +27,50 @@ logger = get_logger(__name__)
 
 # Safety cap for free (no-AI) mode so a runaway profile can't email thousands.
 _NO_AI_LIMIT = 500
+
+_PAREN_RE = re.compile(r"\s*\([^)]*\)")
+_DASH_TAIL_RE = re.compile(r"\s+[-–—]\s+[^-–—]*$")  # trailing " - <location/qualifier>"
+_NONWORD_RE = re.compile(r"[^a-z0-9 ]+")
+
+
+def _norm(text: str) -> str:
+    """Normalize a title/company for dedup.
+
+    Lowercase, drop parenthetical and trailing dash suffixes (usually a city or
+    qualifier, e.g. "... - Munich, Germany"), strip punctuation, collapse spaces.
+    """
+    text = _PAREN_RE.sub("", (text or "").lower())
+    text = _DASH_TAIL_RE.sub("", text)
+    text = _NONWORD_RE.sub(" ", text)
+    return " ".join(text.split())
+
+
+def _dedupe_by_company_title(jobs: list[Job]) -> list[Job]:
+    """Collapse the same role posted from several sources / across locations."""
+    seen: set[str] = set()
+    out: list[Job] = []
+    for job in jobs:
+        key = f"{_norm(job.company)}|{_norm(job.title)}"
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(job)
+    return out
+
+
+def _is_stale(job: Job, max_age_days: int) -> bool:
+    days = age_days(job.published_at)
+    return days is not None and days > max_age_days
+
+
+def _sort_by_recency(jobs: list[ScoredJob]) -> list[ScoredJob]:
+    """Newest first; postings with an unknown date sort last (as very old)."""
+    epoch = datetime(1970, 1, 1, tzinfo=UTC)
+    return sorted(
+        jobs,
+        key=lambda s: parse_date(s.job.published_at) or epoch,
+        reverse=True,
+    )
 
 
 @dataclass
@@ -61,11 +107,18 @@ class SearchPipeline:
             raw.extend(collector.safe_collect())
         logger.info("Collected %d jobs total", len(raw))
 
-        # 2. Deduplicate by stable UID.
+        # 2. Deduplicate: first by stable UID, then by normalized company+title
+        #    (the same role often appears from several sources / across cities).
         by_uid: dict[str, Job] = {}
         for job in raw:
             by_uid.setdefault(job.uid, job)
-        deduped = list(by_uid.values())
+        deduped = _dedupe_by_company_title(list(by_uid.values()))
+        logger.info("%d jobs after dedup", len(deduped))
+
+        # 2b. Drop stale postings (older than max_age_days; unknown dates kept).
+        if cfg.max_age_days > 0:
+            deduped = [j for j in deduped if not _is_stale(j, cfg.max_age_days)]
+            logger.info("%d jobs after dropping stale (>%dd)", len(deduped), cfg.max_age_days)
 
         # 3. Drop jobs already emailed to this recipient.
         if history is None:
@@ -90,7 +143,7 @@ class SearchPipeline:
             selected = self._select(evaluated)
         else:
             logger.info("AI ranking disabled — showing all %d CV matches", len(shortlist))
-            selected = shortlist
+            selected = _sort_by_recency(shortlist)
         logger.info("%d jobs selected for the digest", len(selected))
 
         if not selected:

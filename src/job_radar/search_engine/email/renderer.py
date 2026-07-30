@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 
+from ...common.dates import humanize_age
 from ...common.models import ScoredJob
 
 
@@ -25,6 +26,7 @@ def _job_card(scored: ScoredJob) -> str:
     score = scored.final_score
     reasons = ev.reasons if ev else []
     missing = ev.missing_skills if ev else []
+    _posted = humanize_age(job.published_at)
 
     reasons_html = "".join(f"<li>{_esc(r)}</li>" for r in reasons)
     missing_html = (
@@ -52,6 +54,7 @@ def _job_card(scored: ScoredJob) -> str:
     {_esc(job.company)} &middot; {_esc(job.remote_region)}
     {(" &middot; " + _esc(job.location)) if job.location else ""}
     &middot; <span style="color:#8c959f">{_esc(job.source)}</span>
+    {(" &middot; " + _esc(_posted)) if _posted else ""}
   </p>
   <ul style="margin:0;padding-left:18px;font-size:14px;color:#24292f">{reasons_html}</ul>
   {missing_html}

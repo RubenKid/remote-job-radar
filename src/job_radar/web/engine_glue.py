@@ -35,6 +35,7 @@ def save_matches(session: Session, user_id: int, jobs: list[ScoredJob]) -> None:
                 recommendation=bool(ev and ev.recommendation),
                 reasons=json.dumps(ev.reasons if ev else []),
                 missing_skills=json.dumps(ev.missing_skills if ev else []),
+                published_at=scored.job.published_at or "",
             )
         )
 

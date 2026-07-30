@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hmac
 import json
+import re
 import threading
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request, UploadFile
@@ -15,6 +17,7 @@ from sqlalchemy import select
 from starlette.middleware.sessions import SessionMiddleware
 
 from ..common.config import Config
+from ..common.dates import humanize_age, parse_date
 from ..common.logger import get_logger, setup_logging
 from ..profile_engine import ProfileGenerator, extract_text
 from ..profile_engine.models import CandidateProfile
@@ -71,20 +74,15 @@ def create_app() -> FastAPI:
             session.expunge(s)
             return s
 
-    def _matches_for(user_id: int, limit: int = 100) -> list[dict]:
+    def _matches_for(user_id: int, limit: int = 300) -> list[dict]:
         Session = get_sessionmaker()
         with Session() as session:
             rows = session.scalars(
                 select(MatchedJob)
                 .where(MatchedJob.user_id == user_id)
-                .order_by(
-                    MatchedJob.applied.asc(),
-                    MatchedJob.created_at.desc(),
-                    MatchedJob.score.desc(),
-                )
                 .limit(limit)
             ).all()
-            return [
+            items = [
                 {
                     "id": m.id,
                     "title": m.title,
@@ -95,11 +93,19 @@ def create_app() -> FastAPI:
                     "score": m.score,
                     "recommendation": m.recommendation,
                     "applied": m.applied,
+                    "posted": humanize_age(m.published_at),
+                    "_dt": parse_date(m.published_at),
                     "reasons": json.loads(m.reasons or "[]"),
                     "missing_skills": json.loads(m.missing_skills or "[]"),
                 }
                 for m in rows
             ]
+            # Not-applied first, then newest posting first (unknown dates last).
+            epoch = datetime(1970, 1, 1, tzinfo=UTC)
+            items.sort(key=lambda x: (x["applied"], -(x["_dt"] or epoch).timestamp()))
+            for x in items:
+                del x["_dt"]
+            return items
 
     # ----- Landing -----
     @app.get("/", response_class=HTMLResponse)
@@ -213,6 +219,28 @@ def create_app() -> FastAPI:
             if api_key.strip():  # only overwrite when a new key is supplied
                 s.api_key_encrypted = encrypt_secret(api_key.strip(), web.app_secret_key)
         return RedirectResponse("/dashboard?msg=Settings+saved", status_code=303)
+
+    # ----- Edit search keywords (auto-filled from CV, user-editable) -----
+    @app.post("/keywords")
+    def save_keywords(request: Request, keywords: str = Form("")):
+        uid = authmod.current_user_id(request)
+        if uid is None:
+            return RedirectResponse("/", status_code=303)
+        terms: list[str] = []
+        seen: set[str] = set()
+        for raw in re.split(r"[,\n]", keywords):
+            t = raw.strip().lower()
+            if t and t not in seen:
+                seen.add(t)
+                terms.append(t)
+        with session_scope() as session:
+            s = session.scalar(select(Settings).where(Settings.user_id == uid))
+            if s is None or not s.profile_json:
+                return RedirectResponse("/dashboard?error=Upload+a+CV+first", status_code=303)
+            profile = CandidateProfile.model_validate_json(s.profile_json)
+            profile.search_terms = terms
+            s.profile_json = profile.model_dump_json()
+        return RedirectResponse("/dashboard?msg=Keywords+updated", status_code=303)
 
     # ----- CV upload -> profile -----
     @app.post("/cv")

@@ -91,6 +91,7 @@ class Config:
     remote_regions_priority: list[str] = field(
         default_factory=lambda: ["Worldwide", "Europe", "EMEA"]
     )
+    max_age_days: int = 45  # drop postings older than this (0 = keep all)
     request_timeout: int = 30
     max_jobs_per_source: int = 300
 
@@ -139,6 +140,7 @@ class Config:
         cfg.remote_regions_priority = list(
             data.get("remote_regions_priority", cfg.remote_regions_priority)
         )
+        cfg.max_age_days = int(data.get("max_age_days", cfg.max_age_days))
         cfg.request_timeout = int(data.get("request_timeout", cfg.request_timeout))
         cfg.max_jobs_per_source = int(
             data.get("max_jobs_per_source", cfg.max_jobs_per_source)

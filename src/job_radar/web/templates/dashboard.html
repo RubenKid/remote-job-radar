@@ -45,12 +45,18 @@
       <p><strong>{{ profile.seniority or '—' }}</strong> ·
          {{ profile.years_experience }} yrs ·
          {{ profile.skills|length }} skills</p>
-      <p class="tags">
-        {% for term in profile.search_terms[:10] %}<span class="tag">{{ term }}</span>{% endfor %}
-      </p>
+      <h2>Search keywords</h2>
+      <p class="muted" style="font-size:13px;margin:0 0 6px">
+        Auto-filled from your CV — edit these to control exactly what gets searched
+        (comma-separated). Job titles are matched against them.</p>
+      <form method="post" action="/keywords">
+        <textarea name="keywords" rows="3">{{ profile.search_terms|join(', ') }}</textarea>
+        <button class="btn" type="submit">Save keywords</button>
+      </form>
     {% else %}
       <p class="muted">Upload your CV (PDF). Requires an API key above first.</p>
     {% endif %}
+    <hr />
     <form method="post" action="/cv" enctype="multipart/form-data">
       <input type="file" name="cv" accept="application/pdf" required />
       <button class="btn" type="submit">{{ 'Re-upload CV' if profile else 'Upload CV' }}</button>
@@ -84,6 +90,7 @@
       </div>
       <p class="muted" style="margin:4px 0 8px">
         {{ j.company }} · {{ j.region }} · <span style="color:#8c959f">{{ j.source }}</span>
+        {% if j.posted %} · {{ j.posted }}{% endif %}
         {% if j.applied %} · <strong style="color:#1a7f37">applied ✓</strong>{% endif %}
       </p>
       {% if j.reasons %}

@@ -37,10 +37,12 @@ nav a { margin-left: 16px; color: var(--brand); text-decoration: none; }
 .muted { color: var(--muted); font-size: 14px; }
 
 label { display: block; font-size: 14px; margin: 10px 0 4px; }
-input, select {
+input, select, textarea {
   width: 100%; padding: 8px 10px; border: 1px solid var(--line);
   border-radius: 8px; font-size: 14px; background: #fff;
+  font-family: inherit; box-sizing: border-box;
 }
+textarea { resize: vertical; }
 .row { display: flex; gap: 12px; }
 .check { display: flex; align-items: center; gap: 8px; }
 .check input { width: auto; }

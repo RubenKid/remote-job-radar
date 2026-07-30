@@ -118,6 +118,7 @@ class MatchedJob(Base):
     recommendation: Mapped[bool] = mapped_column(Boolean, default=False)
     reasons: Mapped[str] = mapped_column(Text, default="[]")  # JSON list
     missing_skills: Mapped[str] = mapped_column(Text, default="[]")  # JSON list
+    published_at: Mapped[str] = mapped_column(String(40), default="")  # raw source date
     applied: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
@@ -135,6 +136,21 @@ def _normalize_url(url: str) -> str:
     return url
 
 
+def _ensure_columns(engine) -> None:
+    """Add columns introduced after a table was first created (tiny migration)."""
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    if "matched_jobs" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("matched_jobs")}
+    if "published_at" not in cols:
+        with engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE matched_jobs ADD COLUMN published_at VARCHAR DEFAULT ''")
+            )
+
+
 def init_engine(database_url: str) -> None:
     """Initialize the global engine + session factory and create tables."""
     global _engine, _SessionLocal
@@ -143,6 +159,7 @@ def init_engine(database_url: str) -> None:
     _engine = create_engine(database_url, connect_args=connect_args, future=True)
     _SessionLocal = sessionmaker(bind=_engine, expire_on_commit=False, future=True)
     Base.metadata.create_all(_engine)
+    _ensure_columns(_engine)
 
 
 @contextmanager

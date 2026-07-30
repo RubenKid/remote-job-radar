@@ -80,6 +80,9 @@ remote_regions_priority:
   - Europe
   - EMEA
 
+# Drop postings older than this many days (0 = keep all)
+max_age_days: 45
+
 # Networking
 request_timeout: 30
 max_jobs_per_source: 300
