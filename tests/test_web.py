@@ -39,7 +39,7 @@ def test_login_creates_user_and_settings_persist(client):
         data={"email": "alice@example.com", "name": "Alice"},
         follow_redirects=True,
     )
-    assert r.status_code == 200 and "Dashboard" in r.text
+    assert r.status_code == 200 and "Your jobs" in r.text
 
     r = client.post(
         "/settings",
@@ -56,7 +56,7 @@ def test_login_creates_user_and_settings_persist(client):
     )
     assert r.status_code == 200 and "Settings saved" in r.text
 
-    r = client.get("/dashboard")
+    r = client.get("/settings")
     assert "you@example.com" in r.text  # persisted
 
 
@@ -124,6 +124,25 @@ def test_matched_jobs_shown_on_dashboard_and_toggle(client):
     client.post(f"/jobs/{mid}/applied", follow_redirects=True)
     with get_sessionmaker()() as s:
         assert s.get(MatchedJob, mid).applied is True
+
+
+def test_source_toggle_and_effective_sources(client):
+    from sqlalchemy import select
+
+    from job_radar.web.db import Settings, get_sessionmaker
+    from job_radar.web.engine_glue import effective_sources
+
+    client.post("/login", data={"email": "s@x.com", "name": "S"}, follow_redirects=True)
+    assert "Job sources" in client.get("/settings").text
+
+    # Enable only two sources; the rest become disabled.
+    client.post("/sources", data={"sources": ["jobicy", "remoteok"]}, follow_redirects=True)
+    with get_sessionmaker()() as s:
+        st = s.scalar(select(Settings))
+        eff = effective_sources(["remotive", "jobicy", "remoteok", "upwork"], st)
+    assert "remotive" not in eff  # unchecked -> disabled
+    assert "jobicy" in eff and "remoteok" in eff
+    assert "upwork" not in eff  # not connected -> off
 
 
 def test_healthz(client):

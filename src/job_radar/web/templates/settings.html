@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Settings — Remote Job Radar{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+  <h1 style="margin:0">Settings</h1>
+  <a class="btn" href="/dashboard">← Back to jobs</a>
+</div>
+
+{% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+
+<div class="grid" style="margin-top:16px">
+  <section class="card">
+    <h2>AI provider &amp; digest</h2>
+    <p class="muted">Bring your own key. It's stored encrypted.</p>
+    <form method="post" action="/settings">
+      <label>Provider
+        <select name="provider">
+          <option value="openai" {% if settings.provider == 'openai' %}selected{% endif %}>OpenAI</option>
+          <option value="anthropic" {% if settings.provider == 'anthropic' %}selected{% endif %}>Anthropic (Claude)</option>
+        </select>
+      </label>
+      <p class="muted" style="font-size:13px;margin:8px 0 0">
+        Uses the cheapest model automatically (Haiku / gpt-5-mini) to keep cost low.</p>
+      <label>API key
+        <input type="password" name="api_key"
+               placeholder="{% if settings.has_api_key %}•••••• (saved — leave blank to keep){% else %}sk-...{% endif %}" />
+      </label>
+      <label>Send digest to
+        <input type="email" name="digest_email" value="{{ settings.digest_email }}" required />
+      </label>
+      <label class="check">
+        <input type="checkbox" name="enabled" value="true" {% if settings.enabled %}checked{% endif %} />
+        Enabled — send me the daily digest
+      </label>
+      <button class="btn btn-primary" type="submit">Save</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Your CV</h2>
+    {% if profile %}
+      <p class="flash ok">Profile ready ✓</p>
+      <p class="muted">{{ profile.summary }}</p>
+      <h2>Search keywords</h2>
+      <p class="muted" style="font-size:13px;margin:0 0 6px">
+        Auto-filled from your CV — edit to control exactly what gets searched
+        (comma-separated). Job titles are matched against these.</p>
+      <form method="post" action="/keywords">
+        <textarea name="keywords" rows="3">{{ profile.search_terms|join(', ') }}</textarea>
+        <button class="btn" type="submit">Save keywords</button>
+      </form>
+    {% else %}
+      <p class="muted">Upload your CV (PDF). Requires an API key first.</p>
+    {% endif %}
+    <hr />
+    <form method="post" action="/cv" enctype="multipart/form-data">
+      <input type="file" name="cv" accept="application/pdf" required />
+      <button class="btn" type="submit">{{ 'Re-upload CV' if profile else 'Upload CV' }}</button>
+    </form>
+
+    {% if upwork_available %}
+    <hr />
+    <h2>Upwork (freelance gigs)</h2>
+    {% if settings.has_upwork %}
+      <p class="flash ok">Upwork connected ✓</p>
+      <form method="post" action="/auth/upwork/disconnect">
+        <button class="btn" type="submit">Disconnect Upwork</button>
+      </form>
+    {% else %}
+      <p class="muted" style="font-size:13px;margin:0 0 6px">
+        Connect your Upwork account to include remote freelance gigs.</p>
+      <a class="btn" href="/auth/upwork/start">Connect Upwork</a>
+    {% endif %}
+    {% endif %}
+  </section>
+</div>
+
+<section class="card" style="margin-top:16px">
+  <h2>Job sources</h2>
+  <p class="muted" style="font-size:13px;margin:0 0 10px">
+    Choose which boards to search. All are on by default.
+    {% if upwork_available %} Upwork turns on automatically when you connect it.{% endif %}</p>
+  <form method="post" action="/sources">
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px">
+      {% for s in sources %}
+      <label class="check">
+        <input type="checkbox" name="sources" value="{{ s.name }}" {% if s.enabled %}checked{% endif %} />
+        {{ s.label }}
+      </label>
+      {% endfor %}
+    </div>
+    <button class="btn btn-primary" type="submit" style="margin-top:12px">Save sources</button>
+  </form>
+</section>
+
+{% if settings.ready %}
+<section style="margin-top:16px">
+  <form method="post" action="/run-now">
+    <button class="btn btn-primary" type="submit">Send me a digest now</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

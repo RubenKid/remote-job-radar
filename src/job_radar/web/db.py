@@ -67,6 +67,7 @@ class Settings(Base):
     email_max: Mapped[int] = mapped_column(Integer, default=15)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     upwork_refresh_token_encrypted: Mapped[str] = mapped_column(Text, default="")
+    disabled_sources: Mapped[str] = mapped_column(Text, default="[]")  # JSON list
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now
     )
@@ -150,6 +151,7 @@ def _ensure_columns(engine) -> None:
     wanted = [
         ("matched_jobs", "published_at", "VARCHAR"),
         ("settings", "upwork_refresh_token_encrypted", "TEXT"),
+        ("settings", "disabled_sources", "TEXT"),
     ]
     for table, col, coltype in wanted:
         if table not in tables:

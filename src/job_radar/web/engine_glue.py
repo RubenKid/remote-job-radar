@@ -91,4 +91,22 @@ def build_user_config(base: Config, settings: Settings, app_secret: str) -> Conf
         overrides["upwork_refresh_token"] = decrypt_secret(
             settings.upwork_refresh_token_encrypted, app_secret
         )
+    overrides["sources"] = effective_sources(base.sources, settings)
     return replace(base, **overrides)
+
+
+def effective_sources(all_sources: list[str], settings: Settings) -> list[str]:
+    """The sources active for this user: all enabled, minus disabled; Upwork only
+    if the user connected it."""
+    try:
+        disabled = set(json.loads(settings.disabled_sources or "[]"))
+    except (ValueError, TypeError):
+        disabled = set()
+    out = []
+    for s in all_sources:
+        if s == "upwork":
+            if settings.has_upwork and s not in disabled:
+                out.append(s)
+        elif s not in disabled:
+            out.append(s)
+    return out

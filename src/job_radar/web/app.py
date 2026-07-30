@@ -35,6 +35,25 @@ logger = get_logger(__name__)
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 _STATIC_DIR = Path(__file__).parent / "static"
 
+_SOURCE_LABELS = {
+    "remotive": "Remotive",
+    "weworkremotely": "We Work Remotely",
+    "jobicy": "Jobicy",
+    "remoteok": "RemoteOK",
+    "himalayas": "Himalayas",
+    "workingnomads": "Working Nomads",
+    "nodesk": "NoDesk",
+    "arbeitnow": "Arbeitnow",
+    "euremotejobs": "euRemoteJobs",
+    "braintrust": "Braintrust (freelance)",
+    "themuse": "The Muse",
+    "findwork": "Findwork",
+    "serpapi": "Google Jobs (Indeed/LinkedIn)",
+    "greenhouse": "Startups — Greenhouse",
+    "ashby": "Startups — Ashby",
+    "lever": "Startups — Lever",
+}
+
 
 def create_app() -> FastAPI:
     setup_logging()
@@ -164,9 +183,39 @@ def create_app() -> FastAPI:
         authmod.logout_session(request)
         return RedirectResponse("/", status_code=303)
 
-    # ----- Dashboard -----
+    def _source_rows(settings: Settings) -> list[dict]:
+        try:
+            disabled = set(json.loads(settings.disabled_sources or "[]"))
+        except (ValueError, TypeError):
+            disabled = set()
+        return [
+            {"name": name, "label": _SOURCE_LABELS.get(name, name), "enabled": name not in disabled}
+            for name in base_config.sources
+            if name != "upwork"
+        ]
+
+    # ----- Dashboard (jobs first) -----
     @app.get("/dashboard", response_class=HTMLResponse)
     def dashboard(request: Request, msg: str = "", error: str = ""):
+        user = _load_user(request)
+        if user is None:
+            return RedirectResponse("/", status_code=303)
+        settings = _settings_for(user.id)
+        return templates.TemplateResponse(
+            request,
+            "dashboard.html",
+            {
+                "user": user,
+                "settings": settings,
+                "matches": _matches_for(user.id),
+                "msg": msg,
+                "error": error,
+            },
+        )
+
+    # ----- Settings page -----
+    @app.get("/settings", response_class=HTMLResponse)
+    def settings_page(request: Request, msg: str = "", error: str = ""):
         user = _load_user(request)
         if user is None:
             return RedirectResponse("/", status_code=303)
@@ -176,17 +225,35 @@ def create_app() -> FastAPI:
             profile = CandidateProfile.model_validate_json(settings.profile_json)
         return templates.TemplateResponse(
             request,
-            "dashboard.html",
+            "settings.html",
             {
                 "user": user,
                 "settings": settings,
                 "profile": profile,
-                "matches": _matches_for(user.id),
+                "sources": _source_rows(settings),
                 "upwork_available": bool(base_config.upwork_client_id),
                 "msg": msg,
                 "error": error,
             },
         )
+
+    @app.post("/sources")
+    def save_sources(request: Request, sources: list[str] | None = Form(None)):
+        uid = authmod.current_user_id(request)
+        if uid is None:
+            return RedirectResponse("/", status_code=303)
+        enabled = set(sources or [])
+        disabled = [
+            name for name in base_config.sources
+            if name != "upwork" and name not in enabled
+        ]
+        with session_scope() as session:
+            s = session.scalar(select(Settings).where(Settings.user_id == uid))
+            if s is None:
+                s = Settings(user_id=uid)
+                session.add(s)
+            s.disabled_sources = json.dumps(disabled)
+        return RedirectResponse("/settings?msg=Sources+updated", status_code=303)
 
     @app.post("/jobs/{match_id}/applied")
     def toggle_applied(request: Request, match_id: int):
@@ -221,7 +288,7 @@ def create_app() -> FastAPI:
             s.enabled = enabled
             if api_key.strip():  # only overwrite when a new key is supplied
                 s.api_key_encrypted = encrypt_secret(api_key.strip(), web.app_secret_key)
-        return RedirectResponse("/dashboard?msg=Settings+saved", status_code=303)
+        return RedirectResponse("/settings?msg=Settings+saved", status_code=303)
 
     # ----- Edit search keywords (auto-filled from CV, user-editable) -----
     @app.post("/keywords")
@@ -239,11 +306,11 @@ def create_app() -> FastAPI:
         with session_scope() as session:
             s = session.scalar(select(Settings).where(Settings.user_id == uid))
             if s is None or not s.profile_json:
-                return RedirectResponse("/dashboard?error=Upload+a+CV+first", status_code=303)
+                return RedirectResponse("/settings?error=Upload+a+CV+first", status_code=303)
             profile = CandidateProfile.model_validate_json(s.profile_json)
             profile.search_terms = terms
             s.profile_json = profile.model_dump_json()
-        return RedirectResponse("/dashboard?msg=Keywords+updated", status_code=303)
+        return RedirectResponse("/settings?msg=Keywords+updated", status_code=303)
 
     # ----- CV upload -> profile -----
     @app.post("/cv")
@@ -254,7 +321,7 @@ def create_app() -> FastAPI:
         settings = _settings_for(uid)
         if not settings.has_api_key:
             return RedirectResponse(
-                "/dashboard?error=Add+your+AI+API+key+first", status_code=303
+                "/settings?error=Add+your+AI+API+key+first", status_code=303
             )
         tmp = _STATIC_DIR.parent / f"_cv_{uid}.pdf"
         try:
@@ -265,11 +332,11 @@ def create_app() -> FastAPI:
             with session_scope() as session:
                 s = session.scalar(select(Settings).where(Settings.user_id == uid))
                 s.profile_json = profile.model_dump_json()
-            return RedirectResponse("/dashboard?msg=Profile+created", status_code=303)
+            return RedirectResponse("/settings?msg=Profile+created", status_code=303)
         except Exception as exc:  # noqa: BLE001
             logger.warning("CV processing failed for user %s: %s", uid, exc)
             return RedirectResponse(
-                f"/dashboard?error=CV+processing+failed:+{exc}", status_code=303
+                f"/settings?error=CV+processing+failed:+{exc}", status_code=303
             )
         finally:
             tmp.unlink(missing_ok=True)
@@ -312,7 +379,7 @@ def create_app() -> FastAPI:
         if uid is None:
             return RedirectResponse("/", status_code=303)
         if not base_config.upwork_client_id:
-            return RedirectResponse("/dashboard?error=Upwork+not+configured", status_code=303)
+            return RedirectResponse("/settings?error=Upwork+not+configured", status_code=303)
         state = secrets.token_urlsafe(16)
         request.session["upwork_state"] = state
         redirect_uri = web.base_url + "/auth/upwork/callback"
@@ -328,7 +395,7 @@ def create_app() -> FastAPI:
         expected = request.session.pop("upwork_state", None)
         if not code or not state or state != expected:
             return RedirectResponse(
-                "/dashboard?error=Upwork+authorization+failed", status_code=303
+                "/settings?error=Upwork+authorization+failed", status_code=303
             )
         redirect_uri = web.base_url + "/auth/upwork/callback"
         try:
@@ -341,11 +408,11 @@ def create_app() -> FastAPI:
         except Exception as exc:  # noqa: BLE001
             logger.warning("Upwork token exchange failed for user %s: %s", uid, exc)
             return RedirectResponse(
-                "/dashboard?error=Upwork+token+exchange+failed", status_code=303
+                "/settings?error=Upwork+token+exchange+failed", status_code=303
             )
         if not refresh:
             return RedirectResponse(
-                "/dashboard?error=No+Upwork+refresh+token+returned", status_code=303
+                "/settings?error=No+Upwork+refresh+token+returned", status_code=303
             )
         with session_scope() as session:
             s = session.scalar(select(Settings).where(Settings.user_id == uid))
@@ -353,7 +420,7 @@ def create_app() -> FastAPI:
                 s = Settings(user_id=uid)
                 session.add(s)
             s.upwork_refresh_token_encrypted = encrypt_secret(refresh, web.app_secret_key)
-        return RedirectResponse("/dashboard?msg=Upwork+connected", status_code=303)
+        return RedirectResponse("/settings?msg=Upwork+connected", status_code=303)
 
     @app.post("/auth/upwork/disconnect")
     def upwork_disconnect(request: Request):
@@ -364,7 +431,7 @@ def create_app() -> FastAPI:
             s = session.scalar(select(Settings).where(Settings.user_id == uid))
             if s is not None:
                 s.upwork_refresh_token_encrypted = ""
-        return RedirectResponse("/dashboard?msg=Upwork+disconnected", status_code=303)
+        return RedirectResponse("/settings?msg=Upwork+disconnected", status_code=303)
 
     @app.get("/healthz")
     def healthz():
