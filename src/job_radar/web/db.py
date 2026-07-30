@@ -66,6 +66,7 @@ class Settings(Base):
     min_score: Mapped[int] = mapped_column(Integer, default=60)
     email_max: Mapped[int] = mapped_column(Integer, default=15)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    upwork_refresh_token_encrypted: Mapped[str] = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now
     )
@@ -79,6 +80,10 @@ class Settings(Base):
     @property
     def has_api_key(self) -> bool:
         return bool(self.api_key_encrypted)
+
+    @property
+    def has_upwork(self) -> bool:
+        return bool(self.upwork_refresh_token_encrypted)
 
     @property
     def ready(self) -> bool:
@@ -141,14 +146,20 @@ def _ensure_columns(engine) -> None:
     from sqlalchemy import inspect, text
 
     insp = inspect(engine)
-    if "matched_jobs" not in insp.get_table_names():
-        return
-    cols = {c["name"] for c in insp.get_columns("matched_jobs")}
-    if "published_at" not in cols:
-        with engine.begin() as conn:
-            conn.execute(
-                text("ALTER TABLE matched_jobs ADD COLUMN published_at VARCHAR DEFAULT ''")
-            )
+    tables = set(insp.get_table_names())
+    wanted = [
+        ("matched_jobs", "published_at", "VARCHAR"),
+        ("settings", "upwork_refresh_token_encrypted", "TEXT"),
+    ]
+    for table, col, coltype in wanted:
+        if table not in tables:
+            continue
+        cols = {c["name"] for c in insp.get_columns(table)}
+        if col not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(f"ALTER TABLE {table} ADD COLUMN {col} {coltype} DEFAULT ''")
+                )
 
 
 def init_engine(database_url: str) -> None:

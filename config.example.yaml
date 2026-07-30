@@ -25,6 +25,7 @@ sources:
   - themuse   # optional key: set THEMUSE_API_KEY in .env to raise limits
   - findwork  # requires FINDWORK_API_KEY in .env
   - serpapi   # Google Jobs; requires SERPAPI_API_KEY (free tier ~100 searches/mo)
+  - upwork    # freelance gigs; per-user OAuth (Connect Upwork in the dashboard)
   # Per-company ATS boards (only the remote roles are kept). Edit the lists below.
   - greenhouse
   - ashby

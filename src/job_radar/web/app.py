@@ -5,6 +5,7 @@ from __future__ import annotations
 import hmac
 import json
 import re
+import secrets
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,6 +29,7 @@ from .db import MatchedJob, Settings, User, get_sessionmaker, init_engine, sessi
 from .engine_glue import DbHistory, build_user_config, save_matches
 from .security import encrypt_secret
 from .settings import WebSettings
+from .upwork_oauth import authorize_url, exchange_code
 
 logger = get_logger(__name__)
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -180,6 +182,7 @@ def create_app() -> FastAPI:
                 "settings": settings,
                 "profile": profile,
                 "matches": _matches_for(user.id),
+                "upwork_available": bool(base_config.upwork_client_id),
                 "msg": msg,
                 "error": error,
             },
@@ -301,6 +304,67 @@ def create_app() -> FastAPI:
         except Exception as exc:  # noqa: BLE001
             logger.warning("run-now failed for user %s: %s", uid, exc)
             return RedirectResponse(f"/dashboard?error={exc}", status_code=303)
+
+    # ----- Upwork connect (per-user OAuth) -----
+    @app.get("/auth/upwork/start")
+    def upwork_start(request: Request):
+        uid = authmod.current_user_id(request)
+        if uid is None:
+            return RedirectResponse("/", status_code=303)
+        if not base_config.upwork_client_id:
+            return RedirectResponse("/dashboard?error=Upwork+not+configured", status_code=303)
+        state = secrets.token_urlsafe(16)
+        request.session["upwork_state"] = state
+        redirect_uri = web.base_url + "/auth/upwork/callback"
+        return RedirectResponse(
+            authorize_url(base_config.upwork_client_id, redirect_uri, state)
+        )
+
+    @app.get("/auth/upwork/callback")
+    def upwork_callback(request: Request, code: str = "", state: str = ""):
+        uid = authmod.current_user_id(request)
+        if uid is None:
+            return RedirectResponse("/", status_code=303)
+        expected = request.session.pop("upwork_state", None)
+        if not code or not state or state != expected:
+            return RedirectResponse(
+                "/dashboard?error=Upwork+authorization+failed", status_code=303
+            )
+        redirect_uri = web.base_url + "/auth/upwork/callback"
+        try:
+            refresh = exchange_code(
+                base_config.upwork_client_id,
+                base_config.upwork_client_secret,
+                code,
+                redirect_uri,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Upwork token exchange failed for user %s: %s", uid, exc)
+            return RedirectResponse(
+                "/dashboard?error=Upwork+token+exchange+failed", status_code=303
+            )
+        if not refresh:
+            return RedirectResponse(
+                "/dashboard?error=No+Upwork+refresh+token+returned", status_code=303
+            )
+        with session_scope() as session:
+            s = session.scalar(select(Settings).where(Settings.user_id == uid))
+            if s is None:
+                s = Settings(user_id=uid)
+                session.add(s)
+            s.upwork_refresh_token_encrypted = encrypt_secret(refresh, web.app_secret_key)
+        return RedirectResponse("/dashboard?msg=Upwork+connected", status_code=303)
+
+    @app.post("/auth/upwork/disconnect")
+    def upwork_disconnect(request: Request):
+        uid = authmod.current_user_id(request)
+        if uid is None:
+            return RedirectResponse("/", status_code=303)
+        with session_scope() as session:
+            s = session.scalar(select(Settings).where(Settings.user_id == uid))
+            if s is not None:
+                s.upwork_refresh_token_encrypted = ""
+        return RedirectResponse("/dashboard?msg=Upwork+disconnected", status_code=303)
 
     @app.get("/healthz")
     def healthz():

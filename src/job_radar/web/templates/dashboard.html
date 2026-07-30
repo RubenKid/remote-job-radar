@@ -62,6 +62,21 @@
       <button class="btn" type="submit">{{ 'Re-upload CV' if profile else 'Upload CV' }}</button>
     </form>
 
+    {% if upwork_available %}
+    <hr />
+    <h2>Upwork (freelance gigs)</h2>
+    {% if settings.has_upwork %}
+      <p class="flash ok">Upwork connected ✓</p>
+      <form method="post" action="/auth/upwork/disconnect">
+        <button class="btn" type="submit">Disconnect Upwork</button>
+      </form>
+    {% else %}
+      <p class="muted" style="font-size:13px;margin:0 0 6px">
+        Connect your Upwork account to include remote freelance gigs.</p>
+      <a class="btn" href="/auth/upwork/start">Connect Upwork</a>
+    {% endif %}
+    {% endif %}
+
     {% if settings.ready %}
     <hr />
     <form method="post" action="/run-now">

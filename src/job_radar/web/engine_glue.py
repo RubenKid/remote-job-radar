@@ -86,4 +86,9 @@ def build_user_config(base: Config, settings: Settings, app_secret: str) -> Conf
     else:
         overrides["openai_api_key"] = api_key
         overrides["openai_model"] = CHEAPEST_MODEL["openai"]
+    # Per-user Upwork token (client_id/secret stay app-level from `base`).
+    if settings.upwork_refresh_token_encrypted:
+        overrides["upwork_refresh_token"] = decrypt_secret(
+            settings.upwork_refresh_token_encrypted, app_secret
+        )
     return replace(base, **overrides)
