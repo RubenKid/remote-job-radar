@@ -9,10 +9,14 @@
 {% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
 {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
 
-<h1 style="margin:16px 0 2px;font-size:22px">{{ job.title }}</h1>
-<p class="muted" style="margin:0 0 16px">
-  {{ job.company }} · {{ job.region }} · <span style="color:#8c959f">{{ job.source }}</span>
-  {% if job.posted %} · {{ job.posted }}{% endif %}
+{% set status_labels = dict(statuses) %}
+<div style="display:flex;align-items:center;gap:12px;margin:18px 0 2px;flex-wrap:wrap">
+  <h1 style="margin:0;font-size:23px">{{ job.title }}</h1>
+  <span class="badge badge-{{ job.status }}">{{ status_labels.get(job.status, job.status) }}</span>
+</div>
+<p class="job-meta" style="margin:0 0 18px">
+  {{ job.company }}<span class="dot">·</span>{{ job.region }}<span class="dot">·</span>{{ job.source }}
+  {% if job.posted %}<span class="dot">·</span>{{ job.posted }}{% endif %}
 </p>
 
 <section class="card">

@@ -1,15 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Jobs — Remote Job Radar{% endblock %}
 {% block content %}
+{% set status_labels = dict(statuses) %}
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
   <h1 style="margin:0">Your jobs {% if matches %}<span class="muted">({{ matches|length }})</span>{% endif %}</h1>
-  <div>
+  <div style="display:flex;gap:8px;align-items:center">
     {% if settings.ready %}
     <form method="post" action="/run-now" style="display:inline">
-      <button class="btn btn-primary" type="submit">Refresh now</button>
+      <button class="btn btn-primary" type="submit" style="margin-top:0">Refresh now</button>
     </form>
     {% endif %}
-    <a class="btn" href="/settings">⚙ Settings</a>
+    <a class="btn" href="/settings" style="margin-top:0">⚙ Settings</a>
   </div>
 </div>
 
@@ -19,47 +20,46 @@
 {% if not settings.ready %}
 <div class="card" style="margin-top:16px">
   <p style="margin:0">Finish setup to start getting jobs: add your AI key and upload
-    your CV in <a href="/settings">Settings</a>.</p>
+    your CV in <a href="/settings" class="hl">Settings</a>.</p>
 </div>
 {% endif %}
 
-<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
-  {% set tabs = statuses + [('dismissed','Dismissed',0),('all','All',0)] %}
+<div class="tabs">
   {% for key, label in statuses %}
-  <a href="/dashboard?show={{ key }}" class="btn"
-     style="{% if show == key %}background:#0969da;color:#fff;border-color:#0969da{% endif %}">{{ label }} ({{ counts[key] }})</a>
+  <a href="/dashboard?show={{ key }}" class="tab {% if show == key %}active{% endif %}">
+    {{ label }} <span class="count">{{ counts[key] }}</span></a>
   {% endfor %}
-  <a href="/dashboard?show=dismissed" class="btn"
-     style="{% if show == 'dismissed' %}background:#0969da;color:#fff;border-color:#0969da{% endif %}">Dismissed ({{ counts.dismissed }})</a>
-  <a href="/dashboard?show=all" class="btn"
-     style="{% if show == 'all' %}background:#0969da;color:#fff;border-color:#0969da{% endif %}">All ({{ counts.all }})</a>
+  <a href="/dashboard?show=dismissed" class="tab {% if show == 'dismissed' %}active{% endif %}">
+    Dismissed <span class="count">{{ counts.dismissed }}</span></a>
+  <a href="/dashboard?show=all" class="tab {% if show == 'all' %}active{% endif %}">
+    All <span class="count">{{ counts.all }}</span></a>
 </div>
 
-<section id="matches" style="margin-top:16px">
+<section id="matches" style="margin-top:18px">
   {% if not matches %}
-    <p class="muted">No jobs here. Once you're set up, hit <strong>Refresh now</strong>
-      (or wait for the daily email) and they'll appear here.</p>
+    <div class="card">
+      <p class="muted" style="margin:0">No jobs here yet. Once you're set up, hit
+        <strong>Refresh now</strong> (or wait for the daily email) and they'll appear here.</p>
+    </div>
   {% else %}
     {% for j in matches %}
-    <div class="card" style="margin-bottom:12px;{% if j.dismissed %}opacity:.55{% endif %}">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
-        <h3 style="margin:0;font-size:16px">
-          <a href="/jobs/{{ j.id }}" style="color:#0969da;text-decoration:none">{{ j.title }}</a>
-        </h3>
+    <div class="job-card {% if j.dismissed %}dimmed{% endif %}">
+      <div class="job-head">
+        <h3 class="job-title"><a href="/jobs/{{ j.id }}">{{ j.title }}</a></h3>
+        <span class="badge badge-{{ j.status }}">{{ status_labels.get(j.status, j.status) }}</span>
       </div>
-      <p class="muted" style="margin:4px 0 10px">
-        {{ j.company }} · {{ j.region }} · <span style="color:#8c959f">{{ j.source }}</span>
-        {% if j.posted %} · {{ j.posted }}{% endif %}
-        {% if j.has_analysis %} · <span style="color:#8250df">fit analysed</span>{% endif %}
-        {% if j.has_cover %} · <span style="color:#8250df">cover letter</span>{% endif %}
+      <p class="job-meta">
+        {{ j.company }}<span class="dot">·</span>{{ j.region }}<span class="dot">·</span>{{ j.source }}
+        {% if j.posted %}<span class="dot">·</span>{{ j.posted }}{% endif %}
+        {% if j.has_analysis %}<span class="dot">·</span><span class="hl">fit analysed</span>{% endif %}
+        {% if j.has_cover %}<span class="dot">·</span><span class="hl">cover letter</span>{% endif %}
       </p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div class="job-actions">
         <a class="btn btn-primary" href="{{ j.url }}" target="_blank" rel="noopener">Apply →</a>
         <a class="btn" href="/jobs/{{ j.id }}">Open</a>
         <form method="post" action="/jobs/{{ j.id }}/status" style="display:inline">
           <input type="hidden" name="show" value="{{ show }}" />
-          <select name="status" onchange="this.form.submit()"
-                  style="padding:6px;border-radius:6px;border:1px solid #d0d7de">
+          <select name="status" onchange="this.form.submit()">
             {% for key, label in statuses %}
             <option value="{{ key }}" {% if j.status == key %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
