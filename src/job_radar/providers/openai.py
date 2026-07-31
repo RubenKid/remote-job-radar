@@ -30,3 +30,14 @@ class OpenAIProvider(LLMProvider):
         )
         content = response.choices[0].message.content or ""
         return self.parse_json(content)
+
+    def complete_text(self, *, system: str, user: str, max_tokens: int = 1024) -> str:
+        response = self._client.chat.completions.create(
+            model=self._model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            max_tokens=max_tokens,
+        )
+        return response.choices[0].message.content or ""

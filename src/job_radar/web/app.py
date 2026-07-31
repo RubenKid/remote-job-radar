@@ -20,6 +20,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from ..common.config import Config
 from ..common.dates import humanize_age, parse_date
 from ..common.logger import get_logger, setup_logging
+from ..coverletter import generate_cover_letter
 from ..profile_engine import ProfileGenerator, extract_text
 from ..profile_engine.models import CandidateProfile
 from ..providers import get_provider
@@ -298,6 +299,71 @@ def create_app() -> FastAPI:
             if match is not None and match.user_id == uid:
                 match.dismissed = not match.dismissed
         return RedirectResponse(f"/dashboard?show={show}", status_code=303)
+
+    # ----- Job detail + AI cover letter -----
+    @app.get("/jobs/{match_id}", response_class=HTMLResponse)
+    def job_detail(request: Request, match_id: int, msg: str = "", error: str = ""):
+        uid = authmod.current_user_id(request)
+        if uid is None:
+            return RedirectResponse("/", status_code=303)
+        Session = get_sessionmaker()
+        with Session() as session:
+            m = session.get(MatchedJob, match_id)
+            if m is None or m.user_id != uid:
+                return RedirectResponse("/dashboard", status_code=303)
+            job = {
+                "id": m.id, "title": m.title, "company": m.company, "url": m.url,
+                "source": m.source, "region": m.remote_region,
+                "posted": humanize_age(m.published_at), "applied": m.applied,
+                "dismissed": m.dismissed, "description": m.description,
+                "cover_letter": m.cover_letter,
+                "reasons": json.loads(m.reasons or "[]"),
+                "missing_skills": json.loads(m.missing_skills or "[]"),
+            }
+        return templates.TemplateResponse(
+            request, "job_detail.html", {"job": job, "msg": msg, "error": error}
+        )
+
+    @app.post("/jobs/{match_id}/cover-letter")
+    def generate_cover(request: Request, match_id: int):
+        uid = authmod.current_user_id(request)
+        if uid is None:
+            return RedirectResponse("/", status_code=303)
+        settings = _settings_for(uid)
+        if not settings.profile_json or not settings.has_api_key:
+            return RedirectResponse(
+                f"/jobs/{match_id}?error=Add+your+CV+and+AI+API+key+in+Settings+first",
+                status_code=303,
+            )
+        with session_scope() as session:
+            m = session.get(MatchedJob, match_id)
+            if m is None or m.user_id != uid:
+                return RedirectResponse("/dashboard", status_code=303)
+            try:
+                cfg = build_user_config(base_config, settings, web.app_secret_key)
+                profile = CandidateProfile.model_validate_json(settings.profile_json)
+                m.cover_letter = generate_cover_letter(
+                    get_provider(cfg), profile,
+                    title=m.title, company=m.company, description=m.description,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("cover letter failed for user %s: %s", uid, exc)
+                return RedirectResponse(
+                    f"/jobs/{match_id}?error=Generation+failed+—+re-save+your+API+key+in+Settings",
+                    status_code=303,
+                )
+        return RedirectResponse(f"/jobs/{match_id}?msg=Cover+letter+ready", status_code=303)
+
+    @app.post("/jobs/{match_id}/cover-letter/save")
+    def save_cover(request: Request, match_id: int, cover_letter: str = Form("")):
+        uid = authmod.current_user_id(request)
+        if uid is None:
+            return RedirectResponse("/", status_code=303)
+        with session_scope() as session:
+            m = session.get(MatchedJob, match_id)
+            if m is not None and m.user_id == uid:
+                m.cover_letter = cover_letter
+        return RedirectResponse(f"/jobs/{match_id}?msg=Saved", status_code=303)
 
     # ----- Settings -----
     @app.post("/settings")

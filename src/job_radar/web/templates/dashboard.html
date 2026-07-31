@@ -61,6 +61,7 @@
       {% endif %}
       <a class="btn btn-primary" href="{{ j.url }}" target="_blank" rel="noopener"
          style="margin-right:8px">Apply →</a>
+      <a class="btn" href="/jobs/{{ j.id }}" style="margin-right:8px">✍️ Cover letter</a>
       <form method="post" action="/jobs/{{ j.id }}/applied" style="display:inline">
         <input type="hidden" name="show" value="{{ show }}" />
         <button class="btn" type="submit">{{ "Not applied" if j.applied else "Applied ✓" }}</button>

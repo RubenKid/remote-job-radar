@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title }} — Remote Job Radar{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+  <a class="btn" href="/dashboard">← Back to jobs</a>
+  <a class="btn btn-primary" href="{{ job.url }}" target="_blank" rel="noopener">Apply →</a>
+</div>
+
+{% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+
+<h1 style="margin:16px 0 2px;font-size:22px">{{ job.title }}</h1>
+<p class="muted" style="margin:0 0 16px">
+  {{ job.company }} · {{ job.region }} · <span style="color:#8c959f">{{ job.source }}</span>
+  {% if job.posted %} · {{ job.posted }}{% endif %}
+</p>
+
+<section class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h2 style="margin:0">Cover letter</h2>
+  </div>
+  <p class="muted" style="font-size:13px;margin:6px 0 10px">
+    AI-drafted from your CV and this role. Review and edit before sending —
+    replace <em>[Your Name]</em> and check every detail.</p>
+
+  {% if job.cover_letter %}
+    <form method="post" action="/jobs/{{ job.id }}/cover-letter/save">
+      <textarea name="cover_letter" rows="16">{{ job.cover_letter }}</textarea>
+      <div style="margin-top:8px">
+        <button class="btn btn-primary" type="submit">Save</button>
+      </div>
+    </form>
+    <form method="post" action="/jobs/{{ job.id }}/cover-letter" style="margin-top:8px">
+      <button class="btn" type="submit">Regenerate</button>
+    </form>
+  {% else %}
+    <form method="post" action="/jobs/{{ job.id }}/cover-letter">
+      <button class="btn btn-primary" type="submit">✍️ Generate cover letter</button>
+    </form>
+  {% endif %}
+</section>
+
+{% if job.reasons or job.missing_skills %}
+<section class="card" style="margin-top:14px">
+  {% if job.reasons %}
+  <h2 style="margin-top:0">Why it matches</h2>
+  <ul style="margin:0;padding-left:18px;font-size:14px">
+    {% for r in job.reasons %}<li>{{ r }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% if job.missing_skills %}
+  <p class="muted" style="font-size:13px;margin:8px 0 0">
+    <strong>Missing:</strong> {{ job.missing_skills|join(", ") }}</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if job.description %}
+<section class="card" style="margin-top:14px">
+  <h2 style="margin-top:0">Job description</h2>
+  <div style="font-size:14px;color:#24292f;white-space:pre-wrap;max-height:420px;overflow:auto">{{ job.description }}</div>
+</section>
+{% endif %}
+{% endblock %}

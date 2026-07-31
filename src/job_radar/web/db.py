@@ -124,6 +124,8 @@ class MatchedJob(Base):
     recommendation: Mapped[bool] = mapped_column(Boolean, default=False)
     reasons: Mapped[str] = mapped_column(Text, default="[]")  # JSON list
     missing_skills: Mapped[str] = mapped_column(Text, default="[]")  # JSON list
+    description: Mapped[str] = mapped_column(Text, default="")  # for cover letters
+    cover_letter: Mapped[str] = mapped_column(Text, default="")  # AI-generated draft
     published_at: Mapped[str] = mapped_column(String(40), default="")  # raw source date
     applied: Mapped[bool] = mapped_column(Boolean, default=False)
     dismissed: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -153,6 +155,8 @@ def _ensure_columns(engine) -> None:
     wanted = [
         ("matched_jobs", "published_at", "VARCHAR DEFAULT ''"),
         ("matched_jobs", "dismissed", "BOOLEAN DEFAULT FALSE"),
+        ("matched_jobs", "description", "TEXT DEFAULT ''"),
+        ("matched_jobs", "cover_letter", "TEXT DEFAULT ''"),
         ("settings", "upwork_refresh_token_encrypted", "TEXT DEFAULT ''"),
         ("settings", "disabled_sources", "TEXT DEFAULT '[]'"),
     ]

@@ -174,6 +174,34 @@ def test_dismiss_filter_and_exclusions(client):
     assert prof.excluded_roles == ["manager", "crypto"]
 
 
+def test_cover_letter_page_and_manual_save(client):
+    from sqlalchemy import select
+
+    from job_radar.web.db import MatchedJob, User, get_sessionmaker
+
+    client.post("/login", data={"email": "c@x.com", "name": "C"}, follow_redirects=True)
+    with get_sessionmaker()() as s:
+        uid = s.scalar(select(User.id))
+        s.add(MatchedJob(user_id=uid, job_uid="c:1", title="iOS Engineer", company="Acme",
+                         url="https://e/1", source="jobicy", description="Build apps"))
+        s.commit()
+        mid = s.scalar(select(MatchedJob.id))
+
+    # Detail page renders with the cover-letter section and description.
+    page = client.get(f"/jobs/{mid}").text
+    assert "Cover letter" in page and "Build apps" in page
+
+    # Generating without an API key errors gracefully.
+    r = client.post(f"/jobs/{mid}/cover-letter", follow_redirects=True)
+    assert "API key" in r.text
+
+    # A manually saved letter persists.
+    client.post(f"/jobs/{mid}/cover-letter/save",
+                data={"cover_letter": "Dear team, hire me."}, follow_redirects=True)
+    with get_sessionmaker()() as s:
+        assert s.get(MatchedJob, mid).cover_letter == "Dear team, hire me."
+
+
 def test_healthz(client):
     assert client.get("/healthz").json() == {"status": "ok"}
 

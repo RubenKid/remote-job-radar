@@ -46,3 +46,14 @@ class AnthropicProvider(LLMProvider):
             "",
         )
         return self.parse_json(text)
+
+    def complete_text(self, *, system: str, user: str, max_tokens: int = 1024) -> str:
+        response = self._client.messages.create(
+            model=self._model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=[{"role": "user", "content": user}],
+        )
+        return next(
+            (block.text for block in response.content if block.type == "text"), ""
+        )

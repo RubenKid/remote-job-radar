@@ -20,6 +20,10 @@ class LLMProvider(ABC):
     def complete_json(self, *, system: str, user: str, max_tokens: int = 4096) -> dict[str, Any]:
         """Send a prompt and return the parsed JSON object the model produced."""
 
+    @abstractmethod
+    def complete_text(self, *, system: str, user: str, max_tokens: int = 1024) -> str:
+        """Send a prompt and return the model's plain-text response."""
+
     @staticmethod
     def parse_json(text: str) -> dict[str, Any]:
         """Best-effort JSON extraction from a model response.
