@@ -16,6 +16,63 @@
 </p>
 
 <section class="card">
+  <h2 style="margin-top:0">Tracker</h2>
+  <form method="post" action="/jobs/{{ job.id }}/status" style="margin-bottom:12px">
+    <input type="hidden" name="back" value="job" />
+    <label style="font-size:14px;margin-right:8px">Status</label>
+    <select name="status" onchange="this.form.submit()"
+            style="padding:6px;border-radius:6px;border:1px solid #d0d7de">
+      {% for key, label in statuses %}
+      <option value="{{ key }}" {% if job.status == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  <form method="post" action="/jobs/{{ job.id }}/notes">
+    <label style="font-size:14px;display:block;margin-bottom:4px">Notes</label>
+    <textarea name="notes" rows="4"
+              placeholder="Recruiter name, interview dates, follow-ups…">{{ job.notes }}</textarea>
+    <div style="margin-top:8px"><button class="btn btn-primary" type="submit">Save notes</button></div>
+  </form>
+</section>
+
+<section class="card" style="margin-top:14px">
+  <h2 style="margin-top:0">Fit &amp; skill gap</h2>
+  <p class="muted" style="font-size:13px;margin:6px 0 10px">
+    AI compares your CV against this role — honest fit, strengths, gaps, and how to stand out.</p>
+  {% if job.analysis %}
+    {% if job.analysis.fit %}<p style="margin:0 0 10px"><strong>{{ job.analysis.fit }}</strong></p>{% endif %}
+    {% if job.analysis.matching_skills %}
+    <p style="font-size:14px;margin:0 0 4px"><strong>Your strengths for this role</strong></p>
+    <ul style="margin:0 0 10px;padding-left:18px;font-size:14px">
+      {% for s in job.analysis.matching_skills %}<li>{{ s }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% if job.analysis.missing_skills %}
+    <p style="font-size:14px;margin:0 0 4px"><strong>Gaps to address</strong></p>
+    <ul style="margin:0 0 10px;padding-left:18px;font-size:14px">
+      {% for s in job.analysis.missing_skills %}<li>{{ s }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% if job.analysis.suggestions %}
+    <p style="font-size:14px;margin:0 0 4px"><strong>How to stand out</strong></p>
+    <ul style="margin:0 0 10px;padding-left:18px;font-size:14px">
+      {% for s in job.analysis.suggestions %}<li>{{ s }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+    <form method="post" action="/jobs/{{ job.id }}/analyze">
+      <button class="btn" type="submit">Re-analyse</button>
+    </form>
+  {% elif has_key %}
+    <form method="post" action="/jobs/{{ job.id }}/analyze">
+      <button class="btn btn-primary" type="submit">🔍 Analyse fit &amp; skill gap</button>
+    </form>
+  {% else %}
+    <p class="muted" style="font-size:13px;margin:0">Add your AI API key in
+      <a href="/settings">Settings</a> to analyse fit.</p>
+  {% endif %}
+</section>
+
+<section class="card" style="margin-top:14px">
   <div style="display:flex;justify-content:space-between;align-items:center">
     <h2 style="margin:0">Cover letter</h2>
   </div>

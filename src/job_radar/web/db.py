@@ -126,8 +126,11 @@ class MatchedJob(Base):
     missing_skills: Mapped[str] = mapped_column(Text, default="[]")  # JSON list
     description: Mapped[str] = mapped_column(Text, default="")  # for cover letters
     cover_letter: Mapped[str] = mapped_column(Text, default="")  # AI-generated draft
+    analysis: Mapped[str] = mapped_column(Text, default="")  # AI skill-gap (JSON)
+    notes: Mapped[str] = mapped_column(Text, default="")  # user notes
+    status: Mapped[str] = mapped_column(String(20), default="new")  # tracker state
     published_at: Mapped[str] = mapped_column(String(40), default="")  # raw source date
-    applied: Mapped[bool] = mapped_column(Boolean, default=False)
+    applied: Mapped[bool] = mapped_column(Boolean, default=False)  # legacy; use status
     dismissed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
@@ -157,6 +160,9 @@ def _ensure_columns(engine) -> None:
         ("matched_jobs", "dismissed", "BOOLEAN DEFAULT FALSE"),
         ("matched_jobs", "description", "TEXT DEFAULT ''"),
         ("matched_jobs", "cover_letter", "TEXT DEFAULT ''"),
+        ("matched_jobs", "analysis", "TEXT DEFAULT ''"),
+        ("matched_jobs", "notes", "TEXT DEFAULT ''"),
+        ("matched_jobs", "status", "VARCHAR DEFAULT 'new'"),
         ("settings", "upwork_refresh_token_encrypted", "TEXT DEFAULT ''"),
         ("settings", "disabled_sources", "TEXT DEFAULT '[]'"),
     ]
@@ -167,6 +173,11 @@ def _ensure_columns(engine) -> None:
         if col not in cols:
             with engine.begin() as conn:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}"))
+                # Backfill status from the legacy `applied` flag.
+                if col == "status":
+                    conn.execute(
+                        text("UPDATE matched_jobs SET status='applied' WHERE applied")
+                    )
 
 
 def init_engine(database_url: str) -> None:

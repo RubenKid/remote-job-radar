@@ -118,11 +118,11 @@ def test_matched_jobs_shown_on_dashboard_and_toggle(client):
     page = client.get("/dashboard").text
     assert "Senior iOS Engineer" in page
     assert "Acme" in page
-    assert "Strong Swift match" in page
     assert "https://example.com/1" in page
 
-    client.post(f"/jobs/{mid}/applied", follow_redirects=True)
+    client.post(f"/jobs/{mid}/status", data={"status": "applied"}, follow_redirects=True)
     with get_sessionmaker()() as s:
+        assert s.get(MatchedJob, mid).status == "applied"
         assert s.get(MatchedJob, mid).applied is True
 
 
@@ -161,10 +161,10 @@ def test_dismiss_filter_and_exclusions(client):
         s.commit()
         mid = s.scalar(select(MatchedJob.id))
 
-    # Active tab shows it; dismiss it; then active hides it, dismissed shows it.
-    assert "iOS Engineer" in client.get("/dashboard?show=active").text
-    client.post(f"/jobs/{mid}/dismiss", data={"show": "active"}, follow_redirects=True)
-    assert "iOS Engineer" not in client.get("/dashboard?show=active").text
+    # New tab shows it; dismiss it; then new hides it, dismissed shows it.
+    assert "iOS Engineer" in client.get("/dashboard?show=new").text
+    client.post(f"/jobs/{mid}/dismiss", data={"show": "new"}, follow_redirects=True)
+    assert "iOS Engineer" not in client.get("/dashboard?show=new").text
     assert "iOS Engineer" in client.get("/dashboard?show=dismissed").text
 
     # Exclusions persist into the profile.

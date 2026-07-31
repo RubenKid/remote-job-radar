@@ -17,6 +17,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from starlette.middleware.sessions import SessionMiddleware
 
+from ..analysis import generate_analysis
 from ..common.config import Config
 from ..common.dates import humanize_age, parse_date
 from ..common.logger import get_logger, setup_logging
@@ -35,6 +36,15 @@ from .upwork_oauth import authorize_url, exchange_code
 logger = get_logger(__name__)
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 _STATIC_DIR = Path(__file__).parent / "static"
+
+_STATUSES = [
+    ("new", "To review"),
+    ("applied", "Applied"),
+    ("interviewing", "Interviewing"),
+    ("offer", "Offer"),
+    ("rejected", "Rejected"),
+]
+_STATUS_KEYS = {k for k, _ in _STATUSES}
 
 _SOURCE_LABELS = {
     "remotive": "Remotive",
@@ -97,16 +107,15 @@ def create_app() -> FastAPI:
             session.expunge(s)
             return s
 
-    def _matches_for(user_id: int, show: str = "active", limit: int = 300) -> list[dict]:
+    def _matches_for(user_id: int, show: str = "new", limit: int = 300) -> list[dict]:
         Session = get_sessionmaker()
         with Session() as session:
             q = select(MatchedJob).where(MatchedJob.user_id == user_id)
-            if show == "applied":
-                q = q.where(MatchedJob.applied.is_(True), MatchedJob.dismissed.is_(False))
-            elif show == "dismissed":
+            if show == "dismissed":
                 q = q.where(MatchedJob.dismissed.is_(True))
-            elif show != "all":  # "active" (default)
-                q = q.where(MatchedJob.dismissed.is_(False), MatchedJob.applied.is_(False))
+            elif show in _STATUS_KEYS:
+                q = q.where(MatchedJob.status == show, MatchedJob.dismissed.is_(False))
+            # "all" -> no extra filter
             rows = session.scalars(q.limit(limit)).all()
             items = [
                 {
@@ -116,19 +125,17 @@ def create_app() -> FastAPI:
                     "url": m.url,
                     "source": m.source,
                     "region": m.remote_region,
-                    "score": m.score,
-                    "recommendation": m.recommendation,
-                    "applied": m.applied,
+                    "status": m.status,
                     "dismissed": m.dismissed,
+                    "has_cover": bool(m.cover_letter),
+                    "has_analysis": bool(m.analysis),
                     "posted": humanize_age(m.published_at),
                     "_dt": parse_date(m.published_at),
-                    "reasons": json.loads(m.reasons or "[]"),
-                    "missing_skills": json.loads(m.missing_skills or "[]"),
                 }
                 for m in rows
             ]
             epoch = datetime(1970, 1, 1, tzinfo=UTC)
-            items.sort(key=lambda x: (x["applied"], -(x["_dt"] or epoch).timestamp()))
+            items.sort(key=lambda x: -(x["_dt"] or epoch).timestamp())
             for x in items:
                 del x["_dt"]
             return items
@@ -141,11 +148,13 @@ def create_app() -> FastAPI:
                     select(func.count()).select_from(MatchedJob)
                     .where(MatchedJob.user_id == user_id, *conds)
                 ) or 0
-            return {
-                "active": n(MatchedJob.dismissed.is_(False), MatchedJob.applied.is_(False)),
-                "applied": n(MatchedJob.applied.is_(True), MatchedJob.dismissed.is_(False)),
-                "dismissed": n(MatchedJob.dismissed.is_(True)),
+            counts = {
+                k: n(MatchedJob.status == k, MatchedJob.dismissed.is_(False))
+                for k in _STATUS_KEYS
             }
+            counts["dismissed"] = n(MatchedJob.dismissed.is_(True))
+            counts["all"] = n()
+            return counts
 
     # ----- Landing -----
     @app.get("/", response_class=HTMLResponse)
@@ -215,13 +224,13 @@ def create_app() -> FastAPI:
 
     # ----- Dashboard (jobs first) -----
     @app.get("/dashboard", response_class=HTMLResponse)
-    def dashboard(request: Request, show: str = "active", msg: str = "", error: str = ""):
+    def dashboard(request: Request, show: str = "new", msg: str = "", error: str = ""):
         user = _load_user(request)
         if user is None:
             return RedirectResponse("/", status_code=303)
         settings = _settings_for(user.id)
-        if show not in ("active", "applied", "dismissed", "all"):
-            show = "active"
+        if show not in _STATUS_KEYS and show not in ("dismissed", "all"):
+            show = "new"
         return templates.TemplateResponse(
             request,
             "dashboard.html",
@@ -230,6 +239,7 @@ def create_app() -> FastAPI:
                 "settings": settings,
                 "matches": _matches_for(user.id, show),
                 "counts": _match_counts(user.id),
+                "statuses": _STATUSES,
                 "show": show,
                 "msg": msg,
                 "error": error,
@@ -278,19 +288,27 @@ def create_app() -> FastAPI:
             s.disabled_sources = json.dumps(disabled)
         return RedirectResponse("/settings?msg=Sources+updated", status_code=303)
 
-    @app.post("/jobs/{match_id}/applied")
-    def toggle_applied(request: Request, match_id: int, show: str = "active"):
+    @app.post("/jobs/{match_id}/status")
+    def set_status(
+        request: Request, match_id: int,
+        status: str = Form("new"), show: str = "new", back: str = "dashboard",
+    ):
         uid = authmod.current_user_id(request)
         if uid is None:
             return RedirectResponse("/", status_code=303)
+        if status not in _STATUS_KEYS:
+            status = "new"
         with session_scope() as session:
             match = session.get(MatchedJob, match_id)
             if match is not None and match.user_id == uid:
-                match.applied = not match.applied
+                match.status = status
+                match.applied = status != "new"  # keep legacy flag roughly in sync
+        if back == "job":
+            return RedirectResponse(f"/jobs/{match_id}?msg=Status+updated", status_code=303)
         return RedirectResponse(f"/dashboard?show={show}", status_code=303)
 
     @app.post("/jobs/{match_id}/dismiss")
-    def toggle_dismiss(request: Request, match_id: int, show: str = "active"):
+    def toggle_dismiss(request: Request, match_id: int, show: str = "new"):
         uid = authmod.current_user_id(request)
         if uid is None:
             return RedirectResponse("/", status_code=303)
@@ -317,11 +335,19 @@ def create_app() -> FastAPI:
                 "posted": humanize_age(m.published_at), "applied": m.applied,
                 "dismissed": m.dismissed, "description": m.description,
                 "cover_letter": m.cover_letter,
+                "status": m.status, "notes": m.notes,
+                "analysis": json.loads(m.analysis) if m.analysis else None,
                 "reasons": json.loads(m.reasons or "[]"),
                 "missing_skills": json.loads(m.missing_skills or "[]"),
             }
+            has_key = m.user_id == uid and _settings_for(uid).has_api_key
         return templates.TemplateResponse(
-            request, "job_detail.html", {"job": job, "msg": msg, "error": error}
+            request,
+            "job_detail.html",
+            {
+                "job": job, "statuses": _STATUSES, "has_key": has_key,
+                "msg": msg, "error": error,
+            },
         )
 
     @app.post("/jobs/{match_id}/cover-letter")
@@ -364,6 +390,48 @@ def create_app() -> FastAPI:
             if m is not None and m.user_id == uid:
                 m.cover_letter = cover_letter
         return RedirectResponse(f"/jobs/{match_id}?msg=Saved", status_code=303)
+
+    @app.post("/jobs/{match_id}/notes")
+    def save_notes(request: Request, match_id: int, notes: str = Form("")):
+        uid = authmod.current_user_id(request)
+        if uid is None:
+            return RedirectResponse("/", status_code=303)
+        with session_scope() as session:
+            m = session.get(MatchedJob, match_id)
+            if m is not None and m.user_id == uid:
+                m.notes = notes
+        return RedirectResponse(f"/jobs/{match_id}?msg=Notes+saved", status_code=303)
+
+    @app.post("/jobs/{match_id}/analyze")
+    def analyze_fit(request: Request, match_id: int):
+        uid = authmod.current_user_id(request)
+        if uid is None:
+            return RedirectResponse("/", status_code=303)
+        settings = _settings_for(uid)
+        if not settings.profile_json or not settings.has_api_key:
+            return RedirectResponse(
+                f"/jobs/{match_id}?error=Add+your+CV+and+AI+API+key+in+Settings+first",
+                status_code=303,
+            )
+        with session_scope() as session:
+            m = session.get(MatchedJob, match_id)
+            if m is None or m.user_id != uid:
+                return RedirectResponse("/dashboard", status_code=303)
+            try:
+                cfg = build_user_config(base_config, settings, web.app_secret_key)
+                profile = CandidateProfile.model_validate_json(settings.profile_json)
+                result = generate_analysis(
+                    get_provider(cfg), profile,
+                    title=m.title, company=m.company, description=m.description,
+                )
+                m.analysis = json.dumps(result)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("fit analysis failed for user %s: %s", uid, exc)
+                return RedirectResponse(
+                    f"/jobs/{match_id}?error=Analysis+failed+—+re-save+your+API+key+in+Settings",
+                    status_code=303,
+                )
+        return RedirectResponse(f"/jobs/{match_id}?msg=Fit+analysis+ready", status_code=303)
 
     # ----- Settings -----
     @app.post("/settings")
