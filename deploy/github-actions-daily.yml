@@ -1,0 +1,39 @@
+# Reliable FREE daily digest via GitHub Actions — runs the worker directly
+# against your Neon DB (no dependency on Render being awake).
+#
+# HOW TO ENABLE (once):
+# 1. GitHub repo → Settings → Secrets and variables → Actions → add the secrets
+#    listed under `env:` below (DATABASE_URL, SMTP_*, FINDWORK_API_KEY,
+#    SERPAPI_API_KEY, APP_SECRET_KEY, and THEMUSE_API_KEY if you have one).
+# 2. GitHub repo → Add file → Create new file →
+#    path: .github/workflows/daily.yml → paste THIS file's contents → Commit.
+# 3. Actions tab → run it once manually ("Run workflow") to test.
+#
+# Schedule is UTC. "0 6 * * *" = 08:00 Europe/Madrid in summer (07:00 in winter;
+# GitHub cron does not follow DST). Adjust the hour if you prefer.
+name: Daily digest
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ".[web]"
+      - run: job-radar-worker
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          FINDWORK_API_KEY: ${{ secrets.FINDWORK_API_KEY }}
+          SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+          THEMUSE_API_KEY: ${{ secrets.THEMUSE_API_KEY }}
