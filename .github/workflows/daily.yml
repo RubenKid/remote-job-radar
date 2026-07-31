@@ -1,16 +1,12 @@
-# Reliable FREE daily digest via GitHub Actions — runs the worker directly
-# against your Neon DB (no dependency on Render being awake).
+# Reliable FREE daily digest — runs the worker directly against Neon, so it
+# doesn't depend on the Render web service being awake.
 #
-# HOW TO ENABLE (once):
-# 1. GitHub repo → Settings → Secrets and variables → Actions → add the secrets
-#    listed under `env:` below (DATABASE_URL, SMTP_*, FINDWORK_API_KEY,
-#    SERPAPI_API_KEY, APP_SECRET_KEY, and THEMUSE_API_KEY if you have one).
-# 2. GitHub repo → Add file → Create new file →
-#    path: .github/workflows/daily.yml → paste THIS file's contents → Commit.
-# 3. Actions tab → run it once manually ("Run workflow") to test.
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   DATABASE_URL, APP_SECRET_KEY, SMTP_HOST, SMTP_PORT, SMTP_USERNAME,
+#   SMTP_PASSWORD, FINDWORK_API_KEY, SERPAPI_API_KEY  (THEMUSE_API_KEY optional).
 #
 # Schedule is UTC. "0 6 * * *" = 08:00 Europe/Madrid in summer (07:00 in winter;
-# GitHub cron does not follow DST). Adjust the hour if you prefer.
+# GitHub cron does not follow DST). Trigger manually from the Actions tab too.
 name: Daily digest
 on:
   schedule:

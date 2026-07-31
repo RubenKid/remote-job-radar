@@ -1,10 +1,6 @@
 # Secrets & local config
 .env
 
-# Optional single-user GitHub Actions workflow (kept local; pushing it needs the
-# gh 'workflow' OAuth scope). The web app's daily cron is handled by render.yaml.
-.github/workflows/
-
 # Generated data
 data/*.json
 data/*.db
