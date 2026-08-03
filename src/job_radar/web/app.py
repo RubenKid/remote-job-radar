@@ -21,6 +21,7 @@ from ..analysis import generate_analysis
 from ..common.config import Config
 from ..common.dates import humanize_age, parse_date
 from ..common.logger import get_logger, setup_logging
+from ..common.text import html_to_text
 from ..coverletter import generate_cover_letter
 from ..profile_engine import ProfileGenerator, extract_text
 from ..profile_engine.models import CandidateProfile
@@ -333,7 +334,7 @@ def create_app() -> FastAPI:
                 "id": m.id, "title": m.title, "company": m.company, "url": m.url,
                 "source": m.source, "region": m.remote_region,
                 "posted": humanize_age(m.published_at), "applied": m.applied,
-                "dismissed": m.dismissed, "description": m.description,
+                "dismissed": m.dismissed, "description": html_to_text(m.description),
                 "cover_letter": m.cover_letter,
                 "status": m.status, "notes": m.notes,
                 "analysis": json.loads(m.analysis) if m.analysis else None,
@@ -370,7 +371,8 @@ def create_app() -> FastAPI:
                 profile = CandidateProfile.model_validate_json(settings.profile_json)
                 m.cover_letter = generate_cover_letter(
                     get_provider(cfg), profile,
-                    title=m.title, company=m.company, description=m.description,
+                    title=m.title, company=m.company,
+                    description=html_to_text(m.description),
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.warning("cover letter failed for user %s: %s", uid, exc)
@@ -422,7 +424,8 @@ def create_app() -> FastAPI:
                 profile = CandidateProfile.model_validate_json(settings.profile_json)
                 result = generate_analysis(
                     get_provider(cfg), profile,
-                    title=m.title, company=m.company, description=m.description,
+                    title=m.title, company=m.company,
+                    description=html_to_text(m.description),
                 )
                 m.analysis = json.dumps(result)
             except Exception as exc:  # noqa: BLE001

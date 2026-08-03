@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..common.config import Config
 from ..common.models import ScoredJob
+from ..common.text import html_to_text
 from .db import MatchedJob, SentJob, Settings
 from .security import decrypt_secret
 
@@ -35,7 +36,7 @@ def save_matches(session: Session, user_id: int, jobs: list[ScoredJob]) -> None:
                 recommendation=bool(ev and ev.recommendation),
                 reasons=json.dumps(ev.reasons if ev else []),
                 missing_skills=json.dumps(ev.missing_skills if ev else []),
-                description=(scored.job.description or "")[:6000],
+                description=html_to_text(scored.job.description or "")[:6000],
                 published_at=scored.job.published_at or "",
             )
         )
